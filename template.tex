@@ -47,7 +47,7 @@ To cope with this, the author proposes a novel method for the time integration o
 
 \section{Non-iterative SPH}
 
-Governed by the Navier-Stokes equation \ref{equa:1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic euler or leap frog is carried out to update particle position and speed.
+Governed by the Navier-Stokes equation \ref{equa:1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic Euler or leap frog is carried out to update particle position and speed.
 
 \begin{equation}
 	\label{equa:1}
@@ -90,7 +90,7 @@ The author adopts here the splitting strategy as described by \cite{ihmsen2014sp
 Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. To interpolate particle properties a neighborhood search is conducted at each time step to fetch the set of neighbors for each particle. Since such operations can be computationally expensive, spatial data
 structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information. To further minimize time consumed by inevitable query operations at each time step, particles are sorted in accordance with their spatial cell. In this fashion, spatially adjacent particles are stored on adjacent memory slots, enhancing the cache-hit rates during the simulation. Here, the author choose Z-index curve, a commonly used sorting function that effectively preserves spatial locality due to its fractal block structure.
 \par
-The advection force incurred by a particle consists of a viscosity component and some external components. The second order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
+The advection force incurred by a particle consists of a viscosity component and some external components. The second-order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second-order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
 
 \begin{equation}
 	\label{equa:2}
@@ -106,7 +106,7 @@ Based on the advection forces, intermediate advection velocity is computed as fo
 	v_{i}^{*} = v_{i}(t) + \delta t\frac{F_{i}^{advection}}{m_{i}}
 \end{equation}
 
-This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the author chooses the robust variant presented by \cite{monaghan1992smoothed} and computes the advection density via
+This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first-order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the author chooses the robust variant presented by \cite{monaghan1992smoothed} and computes the advection density via
 
 \begin{equation}
 	\label{equa:4}
@@ -125,6 +125,24 @@ Having obtained the advection densities of the particles, pressure at particle p
 This pressure force is then solely responsible for the explicit velocity and position update of the particle, which we discuss in the next subsection.
 
 \subsection{Time Integration}
+
+Despite the fact that multiple common numerical time integration schemes would fit well into the framework of non-iterative SPH solvers, the author employs a modified version of symplectic Euler:
+
+\begin{equation}
+	\label{equa:6}
+	v_{i}(t + \delta t) = v_{i}(t) + \delta	t\frac{F_{i}^{pressure}(t)}{m_{i}}
+	x_{i}(t + \delta t) = x_{i}(t) + \delta t v_{i}(t + \delta t) + \frac{\delta t^{2}}{2}\frac{F_{i}^{pressure}(t)}{m_{i}}
+\end{equation}
+
+where in addition to a first-order tyler expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when using longer time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{PE:vriphys:vriphys10:079-088} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum time step for an individual particle is given by:
+
+\begin{equation}
+	\label{equa:7}
+	\delta t_{i} = min(\lambda_{v}\frac{2r_{i}}{|v_{i}|}, \lambda_{F}\sqrt{\frac{2r_{i}}{F_{i}^{pressure}/m_{i}}})
+\end{equation}
+
+where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where an adaptive global time step is used, the system-wide time step is naturally chosen to be minimum of \ref{equa:7} over all particles.
+
 
 \section{Method}
 
