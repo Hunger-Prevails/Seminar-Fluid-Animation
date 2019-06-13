@@ -88,7 +88,7 @@ The author adopts here the splitting strategy as described by \cite{ihmsen2014sp
 \vskip 0.2in
 
 Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. To interpolate particle properties a neighborhood search is conducted at each time step to fetch the set of neighbors for each particle. Since such operations can be computationally expensive, spatial data
-structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information.
+structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information. To further minimize time consumed by inevitable query operations at each time step, particles are sorted in accordance with their spatial cell. In this fashion, spatially adjacent particles are stored on adjacent memory slots, enhancing the cache-hit rates during the simulation. Here, the author choose Z-index curve, a commonly used sorting function that effectively preserves spatial locality due to its fractal block structure.
 \par
 The advection force incurred by a particle consists of a viscosity component and some external components. The second order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
 
@@ -106,7 +106,7 @@ Based on the advection forces, intermediate advection velocity is computed as fo
 	v_{i}^{*} = v_{i}(t) + \delta t\frac{F_{i}^{advection}}{m_{i}}
 \end{equation}
 
-This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the author chooses the robust variation presented by \cite{monaghan1992smoothed} and computes the advection density via
+This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the author chooses the robust variant presented by \cite{monaghan1992smoothed} and computes the advection density via
 
 \begin{equation}
 	\label{equa:4}
@@ -115,7 +115,14 @@ This equation can be perceived as an intermediate velocity update using symplect
 
 where the first term describes the static density at particle position $ x_{i} $ and the second term describes the density change during step $ \delta t_{i} $ as a consequence of diverging velocity field.
 \par
+Having obtained the advection densities of the particles, pressure at particle position $ x_{i} $ is computed as $ p_{i} = k(\rho_{i}^{*} - \rho_{0}) $, where $ \rho_{0} $ is the system's reference density and k is the stiffness parameter. Negative pressures are clamped to zero as in \cite{ihmsen2013implicit} to prevent the water splashes from being absorbed as a result of the induced cohesive effect. Finally, the respective pressure forces are calculated using the momentum-preserving variant:
 
+\begin{equation}
+	\label{equa:5}
+	F_{i}^{pressure} = -m_{i}\sum_{j}m_{j}(\frac{p_{i}}{(\rho_{i}^{*})^{2}} + \frac{p_{j}}{(\rho_{j}^{*})^{2}})\nabla W_{ij}
+\end{equation}
+
+This pressure force is then solely responsible for the explicit velocity and position update of the particle, which we discuss in the next subsection.
 
 \subsection{Time Integration}
 
