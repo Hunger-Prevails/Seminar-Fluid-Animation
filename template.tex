@@ -37,6 +37,8 @@ This is a reference \cite{Foley:1990}.
 
 \section{Non-iterative SPH}
 
+Governed by the Navier-Stokes equation, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid property $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normallizing kernel function that is of compact support. 
+
 \section{Method}
 
 \section{Experiments}
@@ -45,7 +47,7 @@ This is a reference \cite{Foley:1990}.
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.45]{images/2}
+	\includegraphics[scale=0.3]{images/1}
 	\caption{
 		\label{fig:im1} For fluid simulation based on SPH, the magnitude of velocity differs substantially 			across particles from different regions (right). As a result, the maximum possible time steps for each 		individual particle could diverge to cover up to multiple magnitudes (left).
 	}
