@@ -56,7 +56,7 @@ Governed by the Navier-Stokes equation \ref{equa:1}, non-iterative SPH performs 
 
 \subsection{Split Equations of State}
 
-The author adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to reflect the expected density at the end of this time step as a result of the divergence in the velocity field if no compensating pressure force is generated. pressures $ p $ pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
+The author adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to represent the expected density at the end of this time step as a result of the divergence in the velocity field if no compensating pressure force is generated. pressures $ p $ pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
 
 \vskip 0.2in
 \begin{algorithm}[H]
@@ -87,13 +87,34 @@ The author adopts here the splitting strategy as described by \cite{ihmsen2014sp
 \end{algorithm}
 \vskip 0.2in
 
-Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. The advection force incurred by a particle consists of a viscosity component and some external components. The second order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
+Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. To interpolate particle properties a neighborhood search is conducted at each time step to fetch the set of neighbors for each particle. Since such operations can be computationally expensive, spatial data
+structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information.
+\par
+The advection force incurred by a particle consists of a viscosity component and some external components. The second order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
 
 \begin{equation}
 	\label{equa:2}
 	F_{i}^{viscosity} = 2m_{i}\nu \sum_{j}\frac{m_{j}}{\rho_{j}}v_{ij}\frac{x_{ij} \cdot \nabla W_{ij}}{x_{ij}\cdot x_{ij} + 0.01h^{2}}
 \end{equation}
 
+where $ \nu $ is a hyperparameter describing the viscocity of the liquid. Since modeling boundary interations and surface tension is not a core theme of this paper, the author directly adopts the method of \cite{akinci2012versatile} and \cite{huber2015evaluation} to handle these two aspects of the advection force.
+\par
+Based on the advection forces, intermediate advection velocity is computed as follows:
+
+\begin{equation}
+	\label{equa:3}
+	v_{i}^{*} = v_{i}(t) + \delta t\frac{F_{i}^{advection}}{m_{i}}
+\end{equation}
+
+This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the author chooses the robust variation presented by \cite{monaghan1992smoothed} and computes the advection density via
+
+\begin{equation}
+	\label{equa:4}
+	\rho_{i}^{*} = \sum_{j}m_{j}W_{ij} + \delta t_{i}\sum_{j}(v_{i}^{*} - v_{j}^{*})\cdot \nabla W_{ij}
+\end{equation}
+
+where the first term describes the static density at particle position $ x_{i} $ and the second term describes the density change during step $ \delta t_{i} $ as a consequence of diverging velocity field.
+\par
 
 
 \subsection{Time Integration}
