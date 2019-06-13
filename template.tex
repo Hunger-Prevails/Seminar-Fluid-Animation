@@ -10,7 +10,6 @@
 	numbers=noenddot
 ]{scrartcl}
 
-\usepackage{lipsum}
 \usepackage{graphicx}
 \usepackage{hyperref}
 
@@ -24,47 +23,33 @@
 \maketitle
 
 
-\section{Introduction}
+\section{Motivation}
 
-Over the years, the adoption of smoothed particle hydrodynamics(SPH) has developed to become the common pratice when simulating fluids in various scenes. While iterative SPH solvers nowadays generally yield better performances, traditional non-iterative approaches do not seem to lessen in popularity due to the fact that they are easy to implement and suitable for less turbulent fluids. In these approaches, the physical state of a fluid particle is constantly influenced by its immediate neighborhood and is thus updated in each time step following a few governing equations that enforces the incompressibility of the fluid. In these equations, the computation of new attributes of the current particle requires several times the access to information from its surrounding neighbors. Intuitively, a natural practice would be to perform global updates to all particles using a single common time step.
+Over the years, the adoption of smoothed particle hydrodynamics(SPH) has developed to become the common pratice when simulating fluids in various scenes. In non-iterative approaches, the physical state of a fluid particle is constantly influenced by its immediate neighborhood and is thus updated in each time step following a few governing equations that enforces the incompressibility of the fluid. In these equations, the computation of new attributes of the current particle requires several times the access to information from its surrounding neighbors. Intuitively, a natural practice would be to, as did many non-iterative SPH solvers, perform global updates to all particles using a single uniform time step. While iterative SPH solvers nowadays generally yield better performances, traditional non-iterative approaches do not seem to lessen in popularity due to the fact that they are easy to implement and suitable for less turbulent fluids.
 \par
-Be that as it may, a core defect of non-iterative SPH solvers lies in the lack of efficiency. To enforce a constantly negligible density deviation within the fluid, large stiffness parameters are adopted to generate high pressures. Such selection of parameters demands smaller time steps and, in turn, greater number of iterations for the sake of stable and correct particle interations. This can lead to tremendously higher overhead for the generation of visually realistic fluid animation, where tens of millions of particles are included to allow for as fine-grained details as possible.
+Be that as it may, a core defect of non-iterative SPH solvers may lie in the lack of efficiency. On one hand, to enforce a constantly negligible density deviation within the fluid, large stiffness parameters are adopted to generate high pressures. Such selection of parameters demands smaller time steps and, in turn, a greater number of iterations for stable and correct particle interations. This can lead to tremendously higher overhead for the generation of visually realistic animation, where tens of millions of particles are included to allow for as fine-grained details as possible. On the other hand, the author made the observation that, while smaller time steps are essential in heavily interacting regions to guarantee stable simulation, in many less complex parts of the fluid a larger time step suffices (see fig. \ref{fig:im1}). That is, the maximum possible time step for a particle varies substantially across different regions of the simulation, and it makes less sense to set one global time step for all particles, since it would inevitably be limited by the single particle with the strictest time constraint and lead to much waste of computational power.
 \par
-To cope with this, the author proposes a novel method for time integration of particles, in which each particle is assigned a unique time step and the whole simulation is carried out fully asynchronous. The author made the observation that, while smaller time steps are necessary in heavily populated regions to gaurantee stable simulation, in most parts of the fluid larger time steps
-suffices. That is, a global time step for all particles
+To cope with this, the author proposes a novel method for the time integration of particles, in which each particle is assigned a individual time step and the whole simulation is carried out fully asynchronous. To ensure consistency, the neighborhood is reconstructed at the current time stamp each time a particle is processed. To demonstrate the strength of the proposed method, the author further proposes a multi-queue parallelization to such fully asynchronous integration procedure. Comparative experiments against related works were conducted under diverse conditions and environments to prove the efficacious enhancement on performance.
+
 \section{Related Work}
 
-This is a reference~\cite{Foley:1990}.
+This is a reference \cite{Foley:1990}.
 
-\section{Images and Tables}
+\section{Non-iterative SPH}
+
+\section{Method}
+
+\section{Experiments}
+
+\section{Conclusion}
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[width=0.5\linewidth]{images/image} 
-	\caption{\label{fig:image} This is an image.
+	\includegraphics[scale=0.45]{images/2}
+	\caption{
+		\label{fig:im1} For fluid simulation based on SPH, the magnitude of velocity differs substantially 			across particles from different regions (right). As a result, the maximum possible time steps for each 		individual particle could diverge to cover up to multiple magnitudes (left).
 	}
 \end{figure}
-
-\begin{table}[tb]
-	{
-		\centering
-		\begin{tabular}{|c|c|c|c|}
-			\hline
-			& col 1 & col 2 & col 3   \\
-			\hline	
-			row 1  & 1 & 2 & 3 \\
-			row 2  & 4 & 5 & 6 \\
-			row 3  & 7 & 8 & 9 \\
-			\hline
-		\end{tabular}
-		\caption{\label{tab:example} This is a table.}
-	}
-\end{table}
-
-
-Figure~\ref{fig:image} shows an example of an image.
-Table~\ref{tab:example} shows an example of a table.
-
 
 \bibliographystyle{alpha}
 \bibliography{references}
