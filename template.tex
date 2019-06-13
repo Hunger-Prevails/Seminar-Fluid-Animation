@@ -51,7 +51,7 @@ Governed by the Navier-Stokes equation \ref{equa:1}, non-iterative SPH performs 
 
 \begin{equation}
 	\label{equa:1}
-	\frac{\Delta{v}}{\Delta{t}} = -\frac{\nabla{p}}{\rho} + \nu{v^{2}} + \frac{F^{external}}{\rho}
+	\frac{\delta v}{\delta t} = -\frac{\nabla p}{\rho} + \nu v^{2} + \frac{F^{external}}{\rho}
 \end{equation}
 
 \subsection{Split Equations of State}
@@ -80,14 +80,20 @@ The author adopts here the splitting strategy as described by \cite{ihmsen2014sp
 		}
 		\For{each particle i}{
 			compute pressure force $ F_{i}^{*} $\;
-			compute new particle velocity $ v_{i}(t + \delta{t}) $\;
-			compute new particle position $ x_{i}(t + \delta{t}) $\;
+			compute new particle velocity $ v_{i}(t + \delta t) $\;
+			compute new particle position $ x_{i}(t + \delta t) $\;
 		}
 	}
 \end{algorithm}
 \vskip 0.2in
 
-Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. 
+Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. The advection force incurred by a particle consists of a viscosity component and some external components. The second order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
+
+\begin{equation}
+	\label{equa:2}
+	F_{i}^{viscosity} = 2m_{i}\nu \sum_{j}\frac{m_{j}}{\rho_{j}}v_{ij}\frac{x_{ij} \cdot \nabla W_{ij}}{x_{ij}\cdot x_{ij} + 0.01h^{2}}
+\end{equation}
+
 
 
 \subsection{Time Integration}
