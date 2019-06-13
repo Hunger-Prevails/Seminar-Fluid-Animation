@@ -10,6 +10,8 @@
 	numbers=noenddot
 ]{scrartcl}
 
+
+\usepackage[ruled]{algorithm2e}
 \usepackage{graphicx}
 \usepackage{hyperref}
 
@@ -42,13 +44,48 @@ To cope with this, the author proposes a novel method for the time integration o
 
 \section{Related Work}
 
-This is a reference .
-
 \section{Non-iterative SPH}
 
-Governed by the Navier-Stokes equation, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normallizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic euler or leap frog is carried out to update particle position and speed.
-\par
-The author adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to reflect the expected density at the end of this time step as a result of the divergence in the velocity field if no compensating pressure force is generated. pressures $ p $ pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation. 
+Governed by the Navier-Stokes equation, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic euler or leap frog is carried out to update particle position and speed.
+
+\subsection{Split Equations of State}
+
+The author adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to reflect the expected density at the end of this time step as a result of the divergence in the velocity field if no compensating pressure force is generated. pressures $ p $ pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
+
+\vskip 0.2in
+\begin{algorithm}[H]
+	\caption{one global step with splitting \cite{reinhardt2017fully}}
+	\label{alg1}
+	\DontPrintSemicolon
+	\SetAlgoLined
+	\SetKwFunction{FMain}{Main}
+	\SetKwProg{Fn}{Function}{:}{}
+	\Fn{\FMain{}}{
+		\For{each particle i}{
+			find neighbors j\;
+		}
+		\For{each particle i}{
+			compute advection force $ F_{i}^{*} = F_{i}^{viscosity} + F_{i}^{ext} $\;
+			compute advection velocity $ v_{i}^{*} $ using $ F_{i}^{*} $\;
+		}
+		\For{each particle i}{
+			compute advection density $ \rho_{i}^{*} $\;
+			compute pressure $ p_{i} $\;
+		}
+		\For{each particle i}{
+			compute pressure force $ F_{i}^{*} $\;
+			compute new particle velocity $ v_{i}(t + \delta{t}) $\;
+			compute new particle position $ x_{i}(t + \delta{t}) $\;
+		}
+	}
+\end{algorithm}
+\vskip 0.2in
+
+Conventionally, a single global update step proceeds as in alg. \ref{alg1}. 
+
+
+\subsection{Time Integration}
+
 
 \section{Method}
 
