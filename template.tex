@@ -14,6 +14,7 @@
 \usepackage[ruled]{algorithm2e}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{amsmath}
 
 
 \title{Fully Asynchronous SPH Simulation}
@@ -46,7 +47,12 @@ To cope with this, the author proposes a novel method for the time integration o
 
 \section{Non-iterative SPH}
 
-Governed by the Navier-Stokes equation, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic euler or leap frog is carried out to update particle position and speed.
+Governed by the Navier-Stokes equation \ref{equa:1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic euler or leap frog is carried out to update particle position and speed.
+
+\begin{equation}
+	\label{equa:1}
+	\frac{\Delta{v}}{\Delta{t}} = -\frac{\nabla{p}}{\rho} + \nu{v^{2}} + \frac{F^{external}}{\rho}
+\end{equation}
 
 \subsection{Split Equations of State}
 
@@ -81,11 +87,10 @@ The author adopts here the splitting strategy as described by \cite{ihmsen2014sp
 \end{algorithm}
 \vskip 0.2in
 
-Conventionally, a single global update step proceeds as in alg. \ref{alg1}. 
+Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. 
 
 
 \subsection{Time Integration}
-
 
 \section{Method}
 
