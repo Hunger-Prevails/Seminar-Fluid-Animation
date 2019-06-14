@@ -42,7 +42,7 @@ Be that as it may, a core defect of non-iterative SPH solvers may lie in the lac
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.3]{images/1}
+	\includegraphics[scale=0.28]{images/1}
 	\caption{\label{fig2} For fluid simulation based on SPH, the magnitude of velocity differs substantially across particles from different regions (right). As a result, the maximum possible time steps for each individual particle could diverge to cover up to multiple magnitudes (left) \cite{reinhardt2017fully}.}
 \end{figure}
 
@@ -70,7 +70,7 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.1]{images/7}
+	\includegraphics[scale=0.075]{images/7}
 	\caption{\label{fig6} A Z-order curve in 2-dimensional space.}
 \end{figure}
 
@@ -185,7 +185,7 @@ Since velocity and position can be directly pushed forth or back in time under t
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.35]{images/5}
+	\includegraphics[scale=0.3]{images/5}
 	\caption{\label{fig4} Illustration of the neighborhood reconstruction scheme: attributes of neighbors of particle $p_{3}$ are traced back in time to support the computations at the current time step. A particle is processed only when all its neighbors are already temporally ahead of itself. In this particular scenario particle $ p_{4} $ reaches the head of the priority queue after particle $p_{3}$ finishes its individual step \cite{reinhardt2017fully}.}
 \end{figure}
 
@@ -221,7 +221,7 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.35]{images/6}
+	\includegraphics[scale=0.3]{images/6}
 	\caption{\label{fig5} Illustration of the waiting list: the strict particle processing order could be violated when using multiple queues for parallel computation. If a particle at the head of queue $ q_{0} $ has a neighbor in another queue that is less advanced in time, the solver moves it from $ q_{0} $ and stores it on the accompanying waiting list $ wl_{0} $ \cite{reinhardt2017fully}.}
 \end{figure}
 
