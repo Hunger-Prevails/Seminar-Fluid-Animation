@@ -77,9 +77,12 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 \large
 \vskip 0.2in
 \begin{algorithm}[H]
-	\caption{\label{alg1} one global step with splitting \cite{reinhardt2017fully}}
 	\DontPrintSemicolon
 	\SetAlgoLined
+	\SetAlgorithmName{Algorithm}{Algorithm}{List of Algorithms}
+	\SetAlCapNameFnt{\large}
+	\SetAlCapFnt{\large}
+	\caption{\label{alg1} One global step with splitting \cite{reinhardt2017fully}}
 	\SetKwFunction{FMain}{GlobalStep}
 	\SetKwProg{Fn}{Function}{:}{}
 	\Fn{\FMain{}}{
@@ -189,29 +192,38 @@ Since velocity and position can be directly pushed forth or back in time under t
 	\caption{\label{fig4} Illustration of the neighborhood reconstruction scheme: attributes of neighbors of particle $p_{3}$ are traced back in time to support the computations at the current time step. A particle is processed only when all its neighbors are already temporally ahead of itself. In this particular scenario particle $ p_{4} $ reaches the head of the priority queue after particle $p_{3}$ finishes its individual step \cite{reinhardt2017fully}.}
 \end{figure}
 
+\large
 \vskip 0.2in
 \begin{algorithm}[H]
-	\caption{\label{alg2} one individual step in ATS \cite{reinhardt2017fully}}
 	\DontPrintSemicolon
 	\SetAlgoLined
 	\SetKwFunction{FMain}{IndividualStep}
+	\SetAlgorithmName{Algorithm}{Algorithm}{List of Algorithms}
+	\SetAlCapNameFnt{\large}
+	\SetAlCapFnt{\large}
+	\caption{\label{alg2} One individual step in ATS \cite{reinhardt2017fully}}
 	\SetKwProg{Fn}{Function}{:}{}
 	\Fn{\FMain{particle $i$}}{
-		\Indp
 		determine maximum possible time step $ \delta t_{i} $\;
+		\;
 		reconstruct velocities $ v_{j}(t_{i}) $ and positions $ x_{j}(t_{i}) $ of neighbors $j$ at $t_{i}$\;
+		\;
 		compute viscosity force $ F_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ using eq. \ref{eq2}\;
 		compute external forces $ F_{i}^{ext}(t_{i}) $ incurred by particle $i$\;
 		compute advection force $ F_{i}^{*}(t_{i}) $ incurred by particle $i$\;
 		compute advection velocity $ v_{i}^{*}(t_{i}) $ of particle $i$ using eq. \ref{eq3}\;
 		compute advection density $ \rho_{i}^{*} $ of particle $i$ using eq. \ref{eq4}\;
 		compute pressure $ p_{i} = k(\rho_{i}^{*} - \rho_{0}) $ of particle $i$\;
+		\;
 		reconstruct advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighbors $j$ at $t_{i}$\;
+		\;
 		compute pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ using eq. \ref{eq5}\;
+		\;
 		integrate particle $i$ over time using $ \delta t_{i} $\;
 	}
 \end{algorithm}
 \vskip 0.2in
+\normalsize
 
 To guarantee stable and correct behavior of the algorithm, the author stipulates empirically that the attributes of neighboring particles should only be traced back in time. In other words, a particle is only to be processed if its entire neighborhood is more advanced in time than itself. To explicitly enforce such strict processing order, a priority queue storing only particle indices is introduced to constantly arange the particles in chronological order. Specificaly, until the next virtual export barrier is reached, the solver repeatedly dequeues the particle at the top of queue, performs one individual step for the particle and then inserts its index back into the queue such that the chronological order within the queue is sustained. After the last particle reaches the next virtual export barrier $t_{exp}$, the attributes of all particles that are demanded by the rendering process are reconstructed at $t_{exp}$ using the same procedure as stated above.
 
@@ -224,6 +236,43 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 	\includegraphics[scale=0.3]{images/6}
 	\caption{\label{fig5} Illustration of the waiting list: the strict particle processing order could be violated when using multiple queues for parallel computation. If a particle at the head of queue $ q_{0} $ has a neighbor in another queue that is less advanced in time, the solver moves it from $ q_{0} $ and stores it on the accompanying waiting list $ wl_{0} $ \cite{reinhardt2017fully}.}
 \end{figure}
+
+\large
+\vskip 0.2in
+\begin{algorithm}[H]
+	\DontPrintSemicolon
+	\SetAlgoLined
+	\SetAlgorithmName{Algorithm}{Algorithm}{List of Algorithms}
+	\SetAlCapNameFnt{\large}
+	\SetAlCapFnt{\large}
+	\caption{\label{alg3} queue handling in parallel \cite{reinhardt2017fully}}
+	\SetKwFunction{FMain}{RunQueue}
+	\SetKwProg{Fn}{Function}{:}{}
+	\Fn{\FMain{queue $q$, time stamp $ t_{exp} $}}{
+		Initialize waiting list wl\;
+		Initialize step count cnt\;
+		\While{$ t_{q.top()} <  t_{exp} $}{
+			$i$ = q.pop()\;
+			find all neighbors $j$ of particle $i$\;
+			\uIf{$ t_{i} < t_{j} $ for all neighbors $j$ of particle $i$}{
+				IndividualStep(i)\;
+				$ t_{i} += \delta t_{i} $\;
+				compute $ \delta t_{i} $ for next iteration\;
+				q.push(i)\;
+			}
+			\Else{
+				wl.push(i)\;
+			}
+			$ cnt += 1 $\;
+			\uIf{cnt == INTERVAL}{
+				insert all particles k in wl into queue\;
+				empty wl\;
+			}
+		}
+	}
+\end{algorithm}
+\vskip 0.2in
+\normalsize
 
 \paragraph{comment}
 
