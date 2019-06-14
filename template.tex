@@ -64,6 +64,9 @@ Governed by the Navier-Stokes equation \ref{equa:1}, non-iterative SPH performs 
 \subsection{Split Equations of State}
 
 The author adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to represent the expected density at the end of this time step as a result of the divergence in the velocity field if no compensating pressure force is generated. pressures $ p $ pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
+\par
+Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. To interpolate particle properties a neighborhood search is conducted at each time step to fetch the set of neighbors for each particle. Since such operations can be computationally expensive, spatial data
+structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information. To further minimize time consumed by inevitable query operations at each time step, particles are sorted in accordance with their spatial cell. In this fashion, spatially adjacent particles are stored on adjacent memory slots, enhancing the cache-hit rates during the simulation. Here, the author choose Z-index curve, a commonly used sorting function that effectively preserves spatial locality due to its fractal block structure.
 
 \vskip 0.2in
 \begin{algorithm}[H]
@@ -93,9 +96,6 @@ The author adopts here the splitting strategy as described by \cite{ihmsen2014sp
 \end{algorithm}
 \vskip 0.2in
 
-Conventionally, a single global update step with the concept of spitting applied proceeds as in alg. \ref{alg1}. To interpolate particle properties a neighborhood search is conducted at each time step to fetch the set of neighbors for each particle. Since such operations can be computationally expensive, spatial data
-structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information. To further minimize time consumed by inevitable query operations at each time step, particles are sorted in accordance with their spatial cell. In this fashion, spatially adjacent particles are stored on adjacent memory slots, enhancing the cache-hit rates during the simulation. Here, the author choose Z-index curve, a commonly used sorting function that effectively preserves spatial locality due to its fractal block structure.
-\par
 The advection force incurred by a particle consists of a viscosity component and some external components. The second-order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second-order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
 
 \begin{equation}
@@ -147,12 +147,18 @@ where in addition to a first-order tyler expansion, a second-order term is added
 	\delta t_{i} = min(\lambda_{v}\frac{2r_{i}}{|v_{i}|}, \lambda_{F}\sqrt{\frac{2r_{i}}{F_{i}^{pressure}/m_{i}}})
 \end{equation}
 
-where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where an adaptive global time step is used, the system-wide time step is naturally chosen to be minimum of \ref{equa:7} over all particles.
+where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where an globally adaptive time step is used, the system-wide time step is naturally chosen to be minimum of \ref{equa:7} over all particles.
 
 
 \section{Fully Asynchronous SPH}
 
-To mitigate the problem of wasted computational effort in previous works, The author proposes to determine a dedicated time step for each individual particle and avoid any global synchronizing 
+As explained in the last chapter, apart from substantially larger number of time steps, conventional approaches of globally fixed or adaptive time steps introduce several synchronization barriers within one iteration of the simulation. An illustration of this downside is given in \ref{fig3}. To mitigate the problem of wasted computational effort in previous works, the author proposes to assign to each individual particle a dedicated time step determined by eq. \ref{equa:7} and avoid any global synchronization barriers. 
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[scale=0.17]{images/4}
+	\caption{\label{fig3} Illustration of various time stepping methods: (a) fixed time stepping (FTS), (b) globally adaptive time stepping (GTS), and (c) asynchronous time stepping (ATS). Note that with FTS and GTS all particles are updated simultaneously at each time step. With ATS each particle freely advances in time at its own pace, minimizing the overall computational expenditure. Only virtual barriers are need for exporting the outcome of the simulation. A priority queue is required to enforce a strict particle processing order for attribute consistency. \cite{reinhardt2017fully}.}
+\end{figure}
 
 \section{Experiments}
 
