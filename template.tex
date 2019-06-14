@@ -38,7 +38,7 @@ Over the years, the adoption of smoothed particle hydrodynamics(SPH) has develop
 \end{figure}
 
 \par
-Be that as it may, a core defect of non-iterative SPH solvers may lie in the lack of efficiency. On one hand, to enforce a constantly negligible density deviation within the fluid, large stiffness parameters are adopted to generate high pressures. Such selection of parameters demands smaller time steps and, in turn, a greater number of iterations for stable and correct particle interations. This can lead to tremendously higher overhead for the generation of visually realistic animation, where tens of millions of particles are included to allow for as fine-grained details as possible. On the other hand, the author made the observation that, while smaller time steps are essential in heavily interacting regions to guarantee stable simulation, in many less complex parts of the fluid a larger time step suffices (see fig. \ref{fig2}). That is, the maximum possible time step for a particle varies substantially across different regions of the simulation, and it makes less sense to set one global time step for all particles, since it would inevitably be limited by the single particle with the strictest time constraint and lead to much waste of computational power. Previous works that considered this problem had to introduce some global synchronization barriers that improves consistency but somehow shadows the boost on performance during parallel execution.
+Be that as it may, a core defect of non-iterative SPH solvers may lie in the lack of efficiency. On one hand, to enforce a constantly negligible density deviation within the fluid, large stiffness parameters are adopted to generate high pressures. Such selection of parameters demands smaller time steps and, in turn, a greater number of iterations for stable and correct particle interations. This can lead to tremendously higher overhead for the generation of visually realistic animation, where tens of millions of particles are included to allow for as fine-grained details as possible. On the other hand, the author made the observation that, while smaller time steps are essential in heavily interacting regions to guarantee stable simulation, in many less complex parts of the fluid a larger time step suffices (see fig. \ref{fig2}). That is, the maximum possible time step for a particle varies substantially across different regions of the simulation, and it makes less sense to set one global time step for all particles, since it would inevitably be limited by the single particle with the strictest time constraint and lead to much waste of computational power. Previous works that attempted to tackle this aspect of the problem had to introduce some global synchronization barriers that improves consistency but somehow shadows the boost on performance due to waiting threads within parallel execution.
 
 \begin{figure}[tb]
 	\centering
@@ -152,13 +152,26 @@ where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In 
 
 \section{Fully Asynchronous SPH}
 
-As explained in the last chapter, apart from substantially larger number of time steps, conventional approaches of globally fixed or adaptive time steps introduce several synchronization barriers within one iteration of the simulation. An illustration of this downside is given in \ref{fig3}. To mitigate the problem of wasted computational effort in previous works, the author proposes to assign to each individual particle a dedicated time step determined by eq. \ref{equa:7} and avoid any global synchronization barriers. 
+As explained in previous sections, conventional approaches of globally fixed or adaptive time stepping squander computational resources on particles that could have been integrated with larger time steps. Former works that tries to mitigate the waste on computational power suffer from waiting threads since they introduce multiple times more synchronization barriers within the duration of the simulation. Therefore, the author proposes to assign to each individual particle a dedicated time step determined by eq. \ref{equa:7} and avoid any global synchronization barrier. A comparative illustration of the proposed method is given in \ref{fig3}.
+
+\subsection{Neighborhood Reconstruction at Target Time Stamp}
+
+To achieve such asynchronous SPH simulation, the solver has to constantly ensure that particle $ i $ that currently being processed has immediate access to the attributes $ A(x_{j}) $ of neighboring particles $ j $ at time stamp $ t_{i} $. Since all particles advance through time independently, this can only be achieved if the attributes of neighboring particles can be temporally interpolated. Fortunately, by employing the splitting
+concept, the non-iterative SPH integration already provides a feasible way to conduction such reconstruction efficiently.
 
 \begin{figure}[tb]
 	\centering
 	\includegraphics[scale=0.17]{images/4}
 	\caption{\label{fig3} Illustration of various time stepping methods: (a) fixed time stepping (FTS), (b) globally adaptive time stepping (GTS), and (c) asynchronous time stepping (ATS). Note that with FTS and GTS all particles are updated simultaneously at each time step. With ATS each particle freely advances in time at its own pace, minimizing the overall computational expenditure. Only virtual barriers are need for exporting the outcome of the simulation. A priority queue is required to enforce a strict particle processing order for attribute consistency. \cite{reinhardt2017fully}.}
 \end{figure}
+
+\par
+Similar to alg. \ref{alg1}, one step of integration for an individual particle has the following dependencies:
+\begin{itemize}
+    \item the viscosity force $ F_{i}^{viscosity}(t) $ incurred by particle $i$ is dependent on the positions $ x_{j}(t) $ and velocities $ v_{j}(t) $ of neighboring particles $j$.
+    \item the advection density $ \rho_{i}^{*} $ of particle $i$ is dependent on the advection densities $ v_{j}^{*} $ of neighboring particles $j$.
+    \item the pressure force $ F_{i}^{pressure}(t) $ incurred by particle $i$ is dependent on the advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighboring particles $j$.
+\end{itemize}
 
 \section{Experiments}
 
