@@ -32,8 +32,8 @@ Over the years, the adoption of smoothed particle hydrodynamics(SPH) has develop
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.3]{images/3}
-	\caption{\label{fig1} An example of non-iterative SPH solvers generating fluid scenes with high visual authenticity \cite{reinhardt2017fully}.
+	\includegraphics[scale=0.26]{images/3}
+	\caption{\label{fig1} Animated scenes of dam break and radial flow demonstrate that non-iterative SPH solvers are capable of generating fluid scenes with high visual authenticity \cite{reinhardt2017fully}.
 	}
 \end{figure}
 
@@ -162,7 +162,7 @@ To achieve such asynchronous SPH simulation, the solver has to constantly ensure
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.17]{images/4}
+	\includegraphics[scale=0.18]{images/4}
 	\caption{\label{fig3} Illustration of various time stepping methods: (a) fixed time stepping (FTS), (b) globally adaptive time stepping (GTS), and (c) asynchronous time stepping (ATS). Note that with FTS and GTS all particles are updated simultaneously at each time step. With ATS each particle freely advances in time at its own pace, minimizing the overall computational expenditure. Only virtual barriers are need for exporting the outcome of the simulation. A priority queue is required to enforce a strict particle processing order for attribute consistency. \cite{reinhardt2017fully}.}
 \end{figure}
 
@@ -175,9 +175,14 @@ Similar to alg. \ref{alg1}, one step of integration for an individual particle h
     \item the pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ is dependent on the advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighboring particles $j$.
 \end{itemize}
 
-Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ v_{j} $ and positions $ x_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in eq. \ref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ v_{j}^{*} $ of neighboring particles could be costly, we may assume that the author replaces $ v_{j}^{*}(t_{i}) $ with $ v_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step.
+Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ v_{j} $ and positions $ x_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in eq. \ref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ v_{j}^{*} $ of neighboring particles could be costly, we may assume that the author replaces $ v_{j}^{*}(t_{i}) $ with $ v_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step. An illustration of the neighborhood reconstruction scheme is given in \ref{fig4}.
 
-\large
+\begin{figure}[tb]
+	\centering
+	\includegraphics[scale=0.35]{images/5}
+	\caption{\label{fig4} Illustration of the neighborhood reconstruction scheme: attributes of neighbors of particle $p_{3}$ are traced back in time to support the computations at the current time step. A particle is processed only when all its neighbors are already temporally ahead of itself. In this particular scenario particle $ p_{4} $ becomes the head of the priority queue after particle $p_{3}$ finishes its individual step \cite{reinhardt2017fully}.}
+\end{figure}
+
 \vskip 0.2in
 \begin{algorithm}[H]
 	\caption{\label{alg2} one individual step in ATS \cite{reinhardt2017fully}}
@@ -201,7 +206,6 @@ Since velocity and position can be directly pushed forth or back in time under t
 	}
 \end{algorithm}
 \vskip 0.2in
-\normalsize
 
 To guarantee stable and correct behavior of the algorithm, the author stipulates empirically that the attributes of neighboring particles should only be traced back in time. In other words, a particle is only to be processed if its entire neighborhood is more advanced in time than itself. To explicitly enforce such strict processing order, a priority queue storing only particle indices is introduced to constantly arange the particles in chronological order. Specificaly, until the next virtual export barrier is reached, the solver repeatedly dequeues the particle at the top of queue, performs one individual step for the particle and then inserts its index back into the queue such that the chronological order within the queue is sustained. After the last particle reaches the next virtual export barrier $t_{exp}$, the attributes of all particles that are demanded by the rendering process are reconstructed at $t_{exp}$ using the same procedure as stated above.
 
