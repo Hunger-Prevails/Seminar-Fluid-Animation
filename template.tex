@@ -76,7 +76,7 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 
 \large
 \vskip 0.2in
-\begin{algorithm}[H]
+\begin{algorithm}
 	\DontPrintSemicolon
 	\SetAlgoLined
 	\SetAlgorithmName{Algorithm}{Algorithm}{List of Algorithms}
@@ -171,7 +171,7 @@ To achieve such asynchronous SPH simulation, the solver has to constantly ensure
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.18]{images/4}
+	\includegraphics[scale=0.16]{images/4}
 	\caption{\label{fig3} Illustration of various time stepping methods: (a) fixed time stepping (FTS), (b) globally adaptive time stepping (GTS), and (c) asynchronous time stepping (ATS). Note that with FTS and GTS all particles are updated simultaneously at each time step. With ATS each particle freely advances in time at its own pace, minimizing the overall computational expenditure. Only virtual barriers are need for exporting the outcome of the simulation. A priority queue is required to enforce a strict particle processing order for attribute consistency. \cite{reinhardt2017fully}.}
 \end{figure}
 
@@ -186,15 +186,9 @@ Similar to Alg. \ref{alg1}, one step of integration for an individual particle h
 
 Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ v_{j} $ and positions $ x_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in eq. \ref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ v_{j}^{*} $ of neighboring particles could be costly, we may assume that the author replaces $ v_{j}^{*}(t_{i}) $ with $ v_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step. An illustration of the neighborhood reconstruction scheme is given in Fig. \ref{fig4}.
 
-\begin{figure}[tb]
-	\centering
-	\includegraphics[scale=0.3]{images/5}
-	\caption{\label{fig4} Illustration of the neighborhood reconstruction scheme: attributes of neighbors of particle $p_{3}$ are traced back in time to support the computations at the current time step. A particle is processed only when all its neighbors are already temporally ahead of itself. In this particular scenario particle $ p_{4} $ reaches the head of the priority queue after particle $p_{3}$ finishes its individual step \cite{reinhardt2017fully}.}
-\end{figure}
-
 \large
 \vskip 0.2in
-\begin{algorithm}[H]
+\begin{algorithm}
 	\DontPrintSemicolon
 	\SetAlgoLined
 	\SetKwFunction{FMain}{IndividualStep}
@@ -225,27 +219,33 @@ Since velocity and position can be directly pushed forth or back in time under t
 \vskip 0.2in
 \normalsize
 
+\begin{figure}[tb]
+	\centering
+	\includegraphics[scale=0.25]{images/5}
+	\caption{\label{fig4} Illustration of the neighborhood reconstruction scheme: attributes of neighbors of particle $p_{3}$ are traced back in time to support the computations at the current time step. A particle is processed only when all its neighbors are already temporally ahead of itself. In this particular scenario particle $ p_{4} $ reaches the head of the priority queue after particle $p_{3}$ finishes its individual step \cite{reinhardt2017fully}.}
+\end{figure}
+
 To guarantee stable and correct behavior of the algorithm, the author stipulates empirically that the attributes of neighboring particles should only be traced back in time. In other words, a particle is only to be processed if its entire neighborhood is more advanced in time than itself. To explicitly enforce such strict processing order, a priority queue storing only particle indices is introduced to constantly arange the particles in chronological order. Specificaly, until the next virtual export barrier is reached, the solver repeatedly dequeues the particle at the top of queue, performs one individual step for the particle and then inserts its index back into the queue such that the chronological order within the queue is sustained. After the last particle reaches the next virtual export barrier $t_{exp}$, the attributes of all particles that are demanded by the rendering process are reconstructed at $t_{exp}$ using the same procedure as stated above.
 
 \subsection{Parallelization}
 
-A parallel implementation of the aforementioned time stepping scheme is not straightforward given the constraint on processing order. Naively spawning multiple queues would easily lead to multiple threads stuck at each other due to the fact that a particle could have neighbors in other queues that lags behind in time and force its belonging queue to hang up until the ordinal constraint is fulfilled. To cope with this undesirably inherent character of the devised approach, the author introduces per queue a waiting list as the buffer area. When the solver of a queue runs into a particle that violates the ordinal constraint, this particle is removed and pushed into the waiting list (see Fig. \ref{fig5}). The solver then goes on to process the particle at the head of the queue until a predefined interval is reached and all particles in the waiting list are reinserted into the queue. Alg. \ref{alg3} describes the running process of a priority queue.
+A parallel implementation of the aforementioned time stepping scheme is not straightforward given the restriction on processing order. Naively spawning multiple queues and handling them independently would lead to violation of the ordinal constraint. Adopting simple synchronization strategies could cause multiple threads to be stuck at each other when several particles have neighbors in other queues that lag behind in time, which could force their belonging queues to hang up until the ordinal constraint is fulfilled. To cope with this undesirably inherent character of the devised approach, the author introduces per queue a waiting list as the buffer area. When the solver of a queue runs into a particle that violates the ordinal constraint, this particle is removed and pushed into the waiting list (see Fig. \ref{fig5}). The solver then goes on to process the particle at the top of the queue until a predefined interval is reached and all particles in the waiting list are reinserted into the queue. Alg. \ref{alg3} describes the running process of a priority queue.
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.3]{images/6}
+	\includegraphics[scale=0.25]{images/6}
 	\caption{\label{fig5} Illustration of the waiting list: the strict particle processing order could be violated when using multiple queues for parallel computation. If a particle at the head of queue $ q_{0} $ has a neighbor in another queue that is less advanced in time, the solver moves it from $ q_{0} $ and stores it on the accompanying waiting list $ wl_{0} $ \cite{reinhardt2017fully}.}
 \end{figure}
 
 \large
 \vskip 0.2in
-\begin{algorithm}[H]
+\begin{algorithm}
 	\DontPrintSemicolon
 	\SetAlgoLined
 	\SetAlgorithmName{Algorithm}{Algorithm}{List of Algorithms}
 	\SetAlCapNameFnt{\large}
 	\SetAlCapFnt{\large}
-	\caption{\label{alg3} queue handling in parallel \cite{reinhardt2017fully}}
+	\caption{\label{alg3} Running process of a priority queue \cite{reinhardt2017fully}}
 	\SetKwFunction{FMain}{RunQueue}
 	\SetKwProg{Fn}{Function}{:}{}
 	\Fn{\FMain{queue $q$, time stamp $ t_{exp} $}}{
@@ -275,7 +275,19 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 \normalsize
 
 \paragraph{comment}
+The proposed parallelization scheme presupposes a few conditions to ensure its efficiency. To justify the feasibility of the approach, we need to investigate a few implementation details with discretion.
 
+\subparagraph{step size clipping}
+Despite global synchronization barriers are avoided throughout the simulation, in practice it still helps to clip the invididual time steps to be a multiple of 0.5 ms as in \cite{PE:vriphys:vriphys10:079-088}: Chances are high that spatially adjacent particles tend to be assigned the same step size. When a particle has a neighbor that is equally advanced in time thanks to this clipping operation, the reconstruction of this particular neighbor could be omitted. This could be a huge drop in amount operations for interaction-intensive regions.
+
+\subparagraph{maintenance of neighborhood information}
+To grant efficient query and update of particle neighbors, a uniform grid storing the cells in a one-dimensional array using Z-curve indexing is employed. Since the full construction of such spatial data structure induces a high computational expenditure, a global update of all grid cells is only carried out at each virtual export barrier. To ensure the correctness of a usual neighborhood search implementation, the particles have to be monitored each time they advance in space and time. If a particle changes cell after one individual step, a reference to the particle is instantly added to the new cell without removing the old reference. This is to deal with cases where one neighbor $j$ of a particle $i$ is no longer in $i$'s vicinity after advancing but by the current time stamp $t_{i}$ it still was and should contribute to particle $i$'s attribute computation. Since the kernel function is of compact support, such cell update strategy does not lead to false neighbors and only induces a small extra cost.
+
+\subparagraph{queue splitting}
+Since a Z-curve indexing of the particle arrays is employed, spatially close particles are assigned to the same queues by simply splitting the queues by particle index. Such property is desirable in the sense that if a particle has too many neighbors that appear in other queues it would inevitably be frequently put into the waiting list. Nevertheless as particles travel during the simulation, such spatial separation is detrimented. The author proposes to reinitialize the queues after several virtual export barriers to improve spatial clustering among the particles. Empirically, a reinitialization of the queues is done every half of a second, which serves as a good trade-off between the overhead of reconstructing queues and postponing too many particles that violate the strict particle processing order.
+
+\subparagraph{waiting list handling}
+Detemining the interval to reinsert the postponed particles back into the queue is of vital significance. An interval too small would lead to postponing these violating particles multiple times while a restoration too late would mean to postpone their neighbors in other queues and result in threads stuck at each other. An optimal choice of this hyperparameter relies heavily on the complexity of the scene and is thus done empirically.
 
 
 \section{Experiments}
