@@ -75,7 +75,6 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 \end{figure}
 
 \large
-\vskip 0.2in
 \begin{algorithm}
 	\DontPrintSemicolon
 	\SetAlgoLined
@@ -104,7 +103,6 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 		}
 	}
 \end{algorithm}
-\vskip 0.2in
 \normalsize
 
 The advection force incurred by a particle consists of a viscosity component and some external components. The second-order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second-order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
@@ -187,7 +185,6 @@ Similar to Alg. \ref{alg1}, one step of integration for an individual particle h
 Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ v_{j} $ and positions $ x_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in eq. \ref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ v_{j}^{*} $ of neighboring particles could be costly, we may assume that the author replaces $ v_{j}^{*}(t_{i}) $ with $ v_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step. An illustration of the neighborhood reconstruction scheme is given in Fig. \ref{fig4}.
 
 \large
-\vskip 0.2in
 \begin{algorithm}
 	\DontPrintSemicolon
 	\SetAlgoLined
@@ -216,7 +213,6 @@ Since velocity and position can be directly pushed forth or back in time under t
 		integrate particle $i$ over time using $ \delta t_{i} $\;
 	}
 \end{algorithm}
-\vskip 0.2in
 \normalsize
 
 \begin{figure}[tb]
@@ -318,7 +314,7 @@ To focus on high performance, the largest possible time step size that still mai
 		6 & DB & 10M & 25973.0 & 1.8 & - & 6.3 \\
 		\hline
 	\end{tabular}
-	\caption{\label{tab1} Performance comparison on various scenarios. Runtimes are measured in seconds \cite{reinhardt2017fully}.}
+	\caption{\label{tab1} Performance comparison on various scenarios \cite{reinhardt2017fully}. Runtimes are measured in seconds.}
 \end{table}
 
 Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping methods under different scenerios. Judging from the outcome of the experiments, ATS outperforms all the other methods using either serial or parallel execution while maintaining a stable and realistic silmulation (see Fig. \ref{fig7}). It can be observed that the speedup factor increases as expected when the scale of the scene is enlarged. This is mainly due to the fact that the additional workload induced by handling the waiting list tend to be less influential compared to the overall computational cost when larger amount of particles are included. There is however one thing worth noting: Despite ATS still yields the best performance in the Fountain scenario, the speedup factor turns out to be less impressive than other scenes. The author attributes the decline in performance to a lack of interation in the scene: As the fountain scenario contains a large amount of almost static particles, the speedup gained with individual time steps becomes less decisive.
@@ -326,11 +322,17 @@ Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping met
 \begin{figure}[tb]
 	\centering
 	\includegraphics[scale=0.26]{images/2}
-	\caption{\label{fig7} Visual comparison on the magnitude of particle velocities. Only negligible difference could be identified in the flow pattern behind the collision object \cite{reinhardt2017fully}.}
+	\caption{\label{fig7} Visual comparison on the magnitude of particle velocities \cite{reinhardt2017fully}. Only negligible difference could be identified in the flow pattern behind the collision object.}
 \end{figure}
 
 \subsection{Scaling Study}
-Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test examines 
+Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test measures the overall computation time to obtain the relative speedup when using up to six cores for the same task. The set of experiments are carried out on the Corner-Dam-Break scene with 125k particles. The left of Fig. \ref{fig8} shows the scaling curves obtained for various approaches. ATS scales slightly worse than other methods since inevitable extra work for parallelization is employed. Nevertheless, the difference get smaller as an increasing number of cores are put into use. The author attributes this phenomenon to the fact that all the other methods employ simple loop parallelization: They introduce a large number of synchronization barriers into the simulation. As the number of cores grow, the solver suffers from waiting threads at such barriers and fails to maintain the relative speedup. On the other hand, weak scaling performance is worth investigating for large-scale scenarios. To this end, the author includes a fixed number of 10k particles per core in a Corner-Dam-Break scene and examines how the ratio between overall simulation time under serial and parallel execution develops as more cores are introduced. As shown in Fig. \ref{fig8} (right), ATS outperforms all other methods under this test setting. 
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[scale=0.25]{images/8}
+	\caption{\label{fig8} Visual comparison on the scalability of different time stepping models \cite{reinhardt2017fully}. The strong scaling performance of ATS seems to be less than satisfactory thanks to its extra effort spent on queue and waiting list handling. Nevertheless, in weak scaling test it significantly outperforms all other approaches.}
+\end{figure}
 
 \section{Conclusion}
 
