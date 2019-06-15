@@ -278,7 +278,7 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 The proposed parallelization scheme presupposes a few conditions to ensure its efficiency. To justify the feasibility of the approach, we need to investigate a few implementation details with discretion.
 
 \subparagraph{step size clipping}
-Despite global synchronization barriers are avoided throughout the simulation, in practice it still helps to clip the invididual time steps to be a multiple of 0.5 ms as in \cite{PE:vriphys:vriphys10:079-088}: Chances are high that spatially adjacent particles tend to be assigned the same step size. When a particle has a neighbor that is equally advanced in time thanks to this clipping operation, the reconstruction of this particular neighbor could be omitted. This could be a huge drop in amount operations for interaction-intensive regions.
+Despite global synchronization barriers are avoided throughout the simulation, in practice it still helps to clip the invididual time steps to be a multiple of 0.5 ms as in \cite{goswami2014regional}: Chances are high that spatially adjacent particles tend to be assigned the same step size. When a particle has a neighbor that is equally advanced in time thanks to this clipping operation, the reconstruction of this particular neighbor could be omitted. This could be a huge drop in amount operations for interaction-intensive regions.
 
 \subparagraph{maintenance of neighborhood information}
 To grant efficient query and update of particle neighbors, a uniform grid storing the cells in a one-dimensional array using Z-curve indexing is employed. Since the full construction of such spatial data structure induces a high computational expenditure, a global update of all grid cells is only carried out at each virtual export barrier. To ensure the correctness of a usual neighborhood search implementation, the particles have to be monitored each time they advance in space and time. If a particle changes cell after one individual step, a reference to the particle is instantly added to the new cell without removing the old reference. This is to deal with cases where one neighbor $j$ of a particle $i$ is no longer in $i$'s vicinity after advancing but by the current time stamp $t_{i}$ it still was and should contribute to particle $i$'s attribute computation. Since the kernel function is of compact support, such cell update strategy does not lead to false neighbors and only induces a small extra cost.
@@ -289,8 +289,11 @@ Since a Z-curve indexing of the particle arrays is employed, spatially close par
 \subparagraph{waiting list handling}
 Detemining the interval to reinsert the postponed particles back into the queue is of vital significance. An interval too small would lead to postponing these violating particles multiple times while a restoration too late would mean to postpone their neighbors in other queues and result in threads stuck at each other. An optimal choice of this hyperparameter relies heavily on the complexity of the scene and is thus done empirically.
 
-
 \section{Experiments}
+In this section, comparative experiments against previous methods including fixed time stepping (FTS), globally adaptive time stepping (GTS) \cite{desbrun1996smoothed} and individual stepping (ITS) \cite{ban2018adaptively} are conducted to demonstrate the boost on performance for the proposed method. Particles are rendered as spheres for visual comparison to avoid losing details in surface. The methods of \cite{reinhardt2017visual} and \cite{bhatacharya2011level} are adopted for sphere and surface rendering respectively.
+
+\subsection{Performance Study}
+\subsection{Scaling Study}
 
 \section{Conclusion}
 
