@@ -163,7 +163,7 @@ where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In 
 
 \section{Fully Asynchronous SPH}
 
-As explained in previous sections, conventional approaches of globally fixed or adaptive time stepping squander computational resources on particles that could have been integrated with larger time steps. Former works that tries to mitigate the waste on computational power suffer from waiting threads since they introduce multiple times more synchronization barriers within the duration of the simulation. Therefore, the author proposes to assign to each individual particle a dedicated time step determined by eq. \ref{eq7} and avoid any global synchronization barrier. Only a virtual export barrier is employed from time to time to fetch particle states for rendering purposes. A comparative illustration of the proposed method is given in Fig. \ref{fig3}.
+As explained in previous sections, conventional approaches of fixed or globally adaptive time stepping squander computational resources on particles that could have been integrated with larger time steps. Former works that tries to mitigate the waste on computational power suffer from waiting threads since they introduce multiple times more synchronization barriers within the duration of the simulation. Therefore, the author proposes to assign to each individual particle a dedicated time step determined by eq. \ref{eq7} and avoid any global synchronization barrier. Only a virtual export barrier is employed from time to time to fetch particle states for rendering purposes. A comparative illustration of the proposed method is given in Fig. \ref{fig3}.
 
 \subsection{Sequential Execution of Asynchronous Simulation}
 
@@ -293,7 +293,44 @@ Detemining the interval to reinsert the postponed particles back into the queue 
 In this section, comparative experiments against previous methods including fixed time stepping (FTS), globally adaptive time stepping (GTS) \cite{desbrun1996smoothed} and individual stepping (ITS) \cite{ban2018adaptively} are conducted to demonstrate the boost on performance for the proposed method. Particles are rendered as spheres for visual comparison to avoid losing details in surface. The methods of \cite{reinhardt2017visual} and \cite{bhatacharya2011level} are adopted for sphere and surface rendering respectively.
 
 \subsection{Performance Study}
+To focus on high performance, the largest possible time step size that still maintains a stable simulation is used in all scenarios. Serial execution of all four methods are tested on two Corner-Dam-Break (CDB) scenes with 27k particles (in a cube of 30 x 30 x 30) and 125k particles (in a cube of 50 x 50 x 50) respectively. For parallel execution, three additional larger scenes are included to fully demonstrate the performance and scalability of the methods:
+
+\begin{itemize}
+    \item A Radial-Flow (RF) scene. This scene features a radial force field that, serving as an external force, drives the fluid particles and generates a vortex flow. A rigid body is placed in the fluid to disturb the flow. The whole scenario consists of 300k fluid and 20k boundary particles.
+    \item A Fountain (FN) scene. This scene features a linear force field that propels the fluid particles upwards to generate a fountain. Upon falling down, the particles collide with a slightly deformed cone to form a non-symmetric flow. The whole scenario consists of 1.3M fluid and 16k boundary particles.
+    \item A Dam-Break (DB) scene. This scene features three collision cylinders that induces strong impact for the fluid particles. 10M particles constitute the whole scenario.
+\end{itemize}
+
+\begin{table}[tb]
+	\centering
+	\begin{tabular}{|r|r|r|r|r|r|r|}
+		\hline
+		threads & scene & particles & FTS & GTS & ITS & ATS \\
+		\hline
+		& & & runtime & speedup & speedup & speedup \\
+		\hline	
+		1 & CDB & 27k & 396.9 & 3.0 & 4.4 & 7.5 \\
+		1 & CDB & 125k & 1896.7 & 2.5 & 3.6 & 7.3 \\
+		6 & CDB & 27k & 87.17 & 2.8 & 4.1 & 6.3 \\
+		6 & CDB & 125k & 375.9 & 2.2 & 3.2 & 6.8 \\
+		6 & RF & 300k & 926.7 & 1.3 & 3.0 & 7.5 \\
+		6 & FN & 1.3M & 3245.6 & 1.7 & 2.3 & 4.4 \\
+		6 & DB & 10M & 25973.0 & 1.8 & - & 6.3 \\
+		\hline
+	\end{tabular}
+	\caption{\label{tab1} Performance comparison on various scenarios. Runtimes are measured in seconds \cite{reinhardt2017fully}.}
+\end{table}
+
+Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping methods under different scenerios. Judging from the outcome of the experiments, ATS outperforms all the other methods using either serial or parallel execution while maintaining a stable and realistic silmulation (see Fig. \ref{fig7}). It can be observed that the speedup factor increases as expected when the scale of the scene is enlarged. This is mainly due to the fact that the additional workload induced by handling the waiting list tend to be less influential compared to the overall computational cost when larger amount of particles are included. There is however one thing worth noting: Despite ATS still yields the best performance in the Fountain scenario, the speedup factor turns out to be less impressive than other scenes. The author attributes the decline in performance to a lack of interation in the scene: As the fountain scenario contains a large amount of almost static particles, the speedup gained with individual time steps becomes less decisive.
+
+\begin{figure}[tb]
+	\centering
+	\includegraphics[scale=0.26]{images/2}
+	\caption{\label{fig7} Visual comparison on the magnitude of particle velocities. Only negligible difference could be identified in the flow pattern behind the collision object \cite{reinhardt2017fully}.}
+\end{figure}
+
 \subsection{Scaling Study}
+Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test examines 
 
 \section{Conclusion}
 
