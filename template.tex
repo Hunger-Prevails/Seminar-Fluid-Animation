@@ -32,7 +32,7 @@ Over the years, the adoption of smoothed particle hydrodynamics(SPH) has develop
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.26]{images/3}
+	\includegraphics[scale=0.24]{images/3}
 	\caption{\label{fig1} Animated scenes of dam break and radial flow demonstrate that non-iterative SPH solvers are capable of generating fluid scenes with high visual authenticity \cite{reinhardt2017fully}.
 	}
 \end{figure}
@@ -70,7 +70,7 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.075]{images/7}
+	\includegraphics[scale=0.06]{images/7}
 	\caption{\label{fig6} A Z-order curve in 2-dimensional space.}
 \end{figure}
 
@@ -234,7 +234,6 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 \end{figure}
 
 \large
-\vskip 0.2in
 \begin{algorithm}
 	\DontPrintSemicolon
 	\SetAlgoLined
@@ -267,7 +266,6 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 		}
 	}
 \end{algorithm}
-\vskip 0.2in
 \normalsize
 
 \paragraph{comment}
@@ -326,7 +324,10 @@ Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping met
 \end{figure}
 
 \subsection{Scaling Study}
-Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test measures the overall computation time to obtain the relative speedup when using up to six cores for the same task. The set of experiments are carried out on the Corner-Dam-Break scene with 125k particles. The left of Fig. \ref{fig8} shows the scaling curves obtained for various approaches. ATS scales slightly worse than other methods since inevitable extra work for parallelization is employed. Nevertheless, the difference get smaller as an increasing number of cores are put into use. The author attributes this phenomenon to the fact that all the other methods employ simple loop parallelization: They introduce a large number of synchronization barriers into the simulation. As the number of cores grow, the solver suffers from waiting threads at such barriers and fails to maintain the relative speedup. On the other hand, weak scaling performance is worth investigating for large-scale scenarios. To this end, the author includes a fixed number of 10k particles per core in a Corner-Dam-Break scene and examines how the ratio between overall simulation time under serial and parallel execution develops as more cores are introduced. As shown in Fig. \ref{fig8} (right), ATS outperforms all other methods under this test setting. 
+Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test measures the overall computation time to obtain the relative speedup when using up to six cores for the same task. The set of experiments are carried out on the Corner-Dam-Break scene with 125k particles. The left of Fig. \ref{fig8} shows the scaling curves obtained for various approaches. ATS scales slightly worse than other methods since inevitable extra work for parallelization is employed. Nevertheless, the difference get smaller as an increasing number of cores are put into use. The author attributes this phenomenon to the fact that all the other methods employ simple loop parallelization: They introduce a large number of synchronization barriers into the simulation. As the number of cores grow, the solver suffers from waiting threads at such barriers and fails to maintain the relative speedup. On the other hand, weak scaling performance is worth investigating for large-scale scenarios. To this end, the author includes a fixed number of 10k particles per core in a Corner-Dam-Break scene and examines how the ratio between overall simulation time under serial and parallel execution develops as more cores are introduced. As shown in Fig. \ref{fig8} (right), ATS outperforms all other methods under this test setting. As discussed above, such an outcome could be expected since the overhead introduced by queue handling in ATS becomes negligible compared to neighborhood search and the particle attribute computations when handling larger number of particles.
+
+\subsection{Visual Comparison}
+
 
 \begin{figure}[tb]
 	\centering
@@ -335,6 +336,7 @@ Another important aspect for the analysis of different time stepping models lies
 \end{figure}
 
 \section{Conclusion}
+\section{Acknowledgement}
 
 \bibliographystyle{alpha}
 \bibliography{references}
