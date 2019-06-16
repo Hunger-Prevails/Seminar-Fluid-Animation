@@ -158,14 +158,14 @@ Despite the fact that multiple common numerical time integration schemes would f
 	x_{i}(t + \delta t) = x_{i}(t) + \delta t v_{i}(t + \delta t) + \frac{\delta t^{2}}{2}\frac{F_{i}^{pressure}(t)}{m_{i}}
 \end{equation}
 
-where in addition to a first-order tyler expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when using longer time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{PE:vriphys:vriphys10:079-088} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum time step for an individual particle is given by:
+where in addition to a first-order tyler expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when using longer time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum time step for an individual particle is given by:
 
 \begin{equation}
 	\label{eq7}
 	\delta t_{i} = min(\lambda_{v}\frac{2r_{i}}{|v_{i}|}, \lambda_{F}\sqrt{\frac{2r_{i}}{F_{i}^{pressure}/m_{i}}})
 \end{equation}
 
-where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where an globally adaptive time step is used, the system-wide time step is naturally chosen to be minimum of \ref{eq7} over all particles.
+where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where a globally adaptive time step is used, the system-wide time step is naturally chosen to be minimum of \ref{eq7} over all particles.
 
 
 \section{Fully Asynchronous SPH}
@@ -334,12 +334,12 @@ Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping met
 
 \begin{figure}[tb]
 	\centering
-	\includegraphics[scale=0.25]{images/8}
+	\includegraphics[scale=0.2]{images/8}
 	\caption{\label{fig8} Visual comparison on the scalability of different time stepping models \cite{reinhardt2017fully}. The strong scaling performance of ATS seems to be less than satisfactory thanks to its extra effort spent on queue and waiting list handling. Nevertheless, in weak scaling test it significantly outperforms all other approaches.}
 \end{figure}
 
 \subsection{Scaling Study}
-Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test measures the overall computation time to obtain the relative speedup when using up to six cores for the same task. The set of experiments are carried out on the Corner-Dam-Break scene with 125k particles. The left of Fig. \ref{fig8} shows the scaling curves obtained for various approaches. ATS scales slightly worse than other methods since inevitable extra work for parallelization is employed. Nevertheless, the difference get smaller as an increasing number of cores are put into use. The author attributes this phenomenon to the fact that all the other methods employ simple loop parallelization: They introduce a large number of synchronization barriers into the simulation. As the number of cores grow, the solver suffers from waiting threads at such barriers and fails to maintain the relative speedup. On the other hand, weak scaling performance is worth investigating for large-scale scenarios. To this end, the author includes a fixed number of 10k particles per core in a Corner-Dam-Break scene and examines how the ratio between overall simulation time under serial and parallel execution develops as more cores are introduced. As shown in Fig. \ref{fig8} (right), ATS outperforms all other methods under this test setting. As discussed above, such an outcome could be expected since the overhead introduced by queue handling in ATS becomes negligible compared to neighborhood search and the particle attribute computations when handling larger number of particles.
+Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test measures the overall computation time to obtain the relative speedup when using up to six cores for the same task. The set of experiments are carried out on the Corner-Dam-Break scene with 125k particles. The left of Fig. \ref{fig8} shows the scaling curves obtained for various approaches. ATS scales slightly worse than other methods since inevitable extra work for parallelization is employed. Nevertheless, the difference get smaller as an increasing number of cores are put into use. The author attributes this phenomenon to the fact that all the other methods employ simple loop parallelization: They introduce a large number of synchronization barriers into the simulation. As the number of cores grow, the solver suffers from waiting threads at such barriers and fails to maintain the relative speedup. On the other hand, weak scaling performance is worth investigating for large-scale scenarios. To this end, the author includes a fixed number of 10k particles per core in a Corner-Dam-Break scene and examines how parallelism influences the overall simulation time as increasingly more cores are introduced. As shown in Fig. \ref{fig8} (right), ATS outperforms all other methods under this test setting. As discussed above, such an outcome could be expected since the overhead introduced by queue handling in ATS becomes negligible compared to neighborhood search and the particle attribute computations when handling larger number of particles.
 
 \begin{figure}[tb]
 	\centering
@@ -362,7 +362,16 @@ Apart from the aforementioned flaws, ATS still serves as an equally reliable met
 
 
 \section{Conclusion}
-\section{Acknowledgement}
+
+In this work, the author presents a novel asynchronous time stepping method for non-iterative SPH integration. Each particle is at each time given a dedicated time step size and no global synchronization barriers are introduced to avoid time wasted by waiting threads in previous works. To guarantee local consistency and support attribute computation, neighborhood reconstruction is done each time a particle is processed. A strict chronological processing order of the particles in the form of a priority queue is introduced to enhance stability. A multi-queue-based scheme is smartly devised for parallel execution of this fully asynchronous time integration method. In terms of efficiency, the proposed algorithm is capable of achieving a speedup factor of up to 7.5 and outperforms other tested methods under various scenarios using either serial or parallel execution. In terms of scalability and visual correctness, the respective tests yield some drawbacks of the integration scheme that could be further exploited:
+
+\begin{itemize}
+    \item With large proportions of barely moving fluid particles the algorithm's performance boost is undermined. Here the promising work of \cite{goswami2014regional} could be adopted so that the solver handles barely active particles as static ones.
+    \item As pointed out by \cite{bender2010boundary}, the acceleration term in eq. \ref{eq7} dominates the speed term in non-iterative SPH simulation. A natural idea would be to devise a scheme such that the constants $ \lambda_{v} $ and $ \lambda_{F} $ are automatically adapted for the particles according to their neighborhood information.
+    \item Compared to other tested models, asynchronous time stepping leads to higher velocity damping upon interaction with collision objects. Since the author only implemented a simple boundary handling scheme, in which the particles at domain boundaries are clipped in position, reversed in velocity and applied with a user-defined friction, such damping could be alleviated if a more complex boundary handling model is adopted.
+\end{itemize}
+
+
 
 \bibliographystyle{alpha}
 \bibliography{references}
