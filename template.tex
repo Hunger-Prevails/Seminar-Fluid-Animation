@@ -28,7 +28,7 @@
 
 \section{Motivation}
 
-Over the years, the adoption of smoothed particle hydrodynamics(SPH) has developed to become the common pratice when simulating fluids in various scenes. In non-iterative approaches, the physical properties of a fluid particle is constantly influenced by its immediate neighborhood and is thus updated in each time step following a few equations of state that helps compute the components in the Navier-Stokes equation. In these equations, the computation of new attributes of the current particle requires several times the access to information from its surrounding neighbors. Intuitively, a natural practice would be to, as did many non-iterative SPH solvers, perform global updates to all particles using a single uniform time step. While iterative SPH solvers nowadays generally yield better performances, traditional non-iterative approaches do not seem to lessen in popularity due to the fact that they are easy to implement and suitable for less turbulent fluids (see Fig. \ref{fig1}).
+Over the years, the adoption of smoothed particle hydrodynamics(SPH) has developed to become the common pratice when simulating fluids in various scenes. In non-iterative approaches, the physical properties of a fluid particle is constantly influenced by its immediate neighborhood and is thereby updated in each time step following a few equations of state that helps compute the components in the Navier-Stokes equation. In these equations, the computation of new attributes of the current particle requires several times the access to information from its surrounding neighbors. Intuitively, a natural practice would be to, as did many non-iterative SPH solvers, perform global updates to all particles using a single uniform time step. While iterative SPH solvers nowadays generally yield better performances, traditional non-iterative approaches do not seem to lessen in popularity due to the fact that they are easy to implement and suitable for less turbulent fluids (see Fig. \ref{fig1}).
 
 \begin{figure}[tb]
 	\centering
@@ -47,12 +47,32 @@ Be that as it may, a core defect of non-iterative SPH solvers may lie in the lac
 \end{figure}
 
 \par
-To cope with this, the author proposes a novel method for the time integration of particles, in which each particle is assigned a individual time step and the whole simulation is carried out fully asynchronous. By handling each particle
-individually throughout the simulation, the solver expends less computational effort on smoother regions and considerably cut down the overall time consumption. To ensure consistency, the neighborhood is reconstructed at the current time stamp each time a particle is processed. To demonstrate the strength of the proposed method, the author further proposes a multi-queue parallelization to such fully asynchronous integration procedure. Comparative experiments against related works were conducted under diverse conditions and environments to prove the efficacious enhancement on performance.
+To cope with this, the author proposes a novel method for the time integration of particles, in which each particle is assigned a individual time step and the whole simulation is carried out fully asynchronous. By handling each particle individually throughout the simulation, the solver expends less computational effort on smoother regions and considerably cut down the overall time consumption. To ensure consistency, the neighborhood is reconstructed at the current time stamp each time a particle is processed. To demonstrate the strength of the proposed method, the author further proposes a multi-queue parallelization to such fully asynchronous integration procedure. Comparative experiments against related works were conducted under diverse conditions and environments to prove the efficacious enhancement on performance.
 
 \section{Related Work}
 
-Here are some related works.
+Since the contribution of this paper focuses on the temporal adaptivity of SPH-based fluid simulations (i.e. how the time step size of SPH integration models could be adapted to enhance the performance of the simulation) and how the proposed method could be parallelized, we discuss related works in these two directions separately.
+
+\subsection{Temporal Adaptivity}
+
+Extensive studies have been conducted on the temporal adaptivity of SPH models:
+
+\begin{itemize}
+    \item For synchronous SPH simulation, temporal adaptivity could be exploited as in \cite{desbrun1996smoothed}. For each global iteration they determine the uniform step size to be the maximum possible step size of the particle with the strictest CFL constraint. This scheme is also adopted by \cite{bender2010boundary}, who added an additional acceleration constraint as the second term.
+    \item \cite{goswami2014regional} introduces a regionally synchronous integration model. They divide all particles into separate rigions depending on their maximum possible step size and fix a uniform step size for each region that is a multiple of the user-defined base value.
+    \item \cite{desbrun1996smoothed} explored the possibility to apply individual times steps. For each particle the user-defined simulation time step is divided by powers of two to the extent such that the CFL condition is met. Forces are evaluated only at individual time steps to facilitate gains in performance. \cite{ban2018adaptively} follows this idea and proposes a semi-synchronous time stepping scheme. They introduce the concept of a virtual system time line that advances with the smallest individual time step of all particles. Particles with an individual step size that exceeds the gap between its own time stamp and the system checkpoint are deactivated and only propagated forward using linear interpolation. Those that are active are instead evaluated in the same procedure as in the fully synchronous setting. Such a stepping strategy still introduces a great number of global synchronization barriers although the overall operations are cut down to some extent.
+\end{itemize}
+
+\subsection{Parallelism in SPH Simulation}
+
+Speeding up SPH simulations can also be achieved by exploiting parallelism:
+
+\begin{itemize}
+    \item For neighborhood search and access to particle properties, the community seems to have reached the consensus to utilize a uniform grid to facilitate concurrent queries of neighborhood information \cite{ihmsen2014sph}.
+    \item For synchronous non-iterative SPH simulation, simple loop parallelization could be adopted, since several for-loops are responsible for computing the attributes of the particles in each global step.
+    \item For \cite{goswami2014regional}, parallel computation should be straightforward to implement as for each region the time step size is fixed. However, the solver could suffer from unbalanced load and the waiting threads since at the edge zones of the regions synchronization becomes inevitable.
+    \item For \cite{ban2018adaptively}, since in each global synchronization barrier the solver performs either full integration or linear interpolation on all particles, the parallelization scheme bears little difference to the fully synchronous setting.
+\end{itemize}
 
 \section{Non-iterative SPH}
 
@@ -290,7 +310,7 @@ To grant efficient query and update of particle neighbors, a uniform grid storin
 Since a Z-curve indexing of the particle arrays is employed, spatially close particles are assigned to the same queues by simply splitting the queues by particle index. Such property is desirable in the sense that if a particle has too many neighbors that appear in other queues it would inevitably be frequently put into the waiting list. Nevertheless as particles travel during the simulation, such spatial separation is detrimented. The author proposes to reinitialize the queues after several virtual export barriers to improve spatial clustering among the particles. Empirically, a reinitialization of the queues is done every half of a second, which serves as a good trade-off between the overhead of reconstructing queues and postponing too many particles that violate the strict particle processing order.
 
 \subparagraph{waiting list handling}
-Detemining the interval to reinsert the postponed particles back into the queue is of vital significance. An interval too small would lead to postponing these violating particles multiple times while a restoration too late would mean to postpone their neighbors in other queues and result in threads stuck at each other. An optimal choice of this hyperparameter relies heavily on the complexity of the scene and is thus done empirically.
+Detemining the interval to reinsert the postponed particles back into the queue is of vital significance. An interval too small would lead to postponing these violating particles multiple times while a restoration too late would mean to postpone their neighbors in other queues and result in threads stuck at each other. An optimal choice of this hyperparameter relies heavily on the complexity of the scene and is hence done empirically.
 
 \section{Experiments}
 In this section, comparative experiments against previous methods including fixed time stepping (FTS), globally adaptive time stepping (GTS) \cite{desbrun1996smoothed} and individual stepping (ITS) \cite{ban2018adaptively} are conducted to demonstrate the boost on performance for the proposed method. Particles are rendered as spheres for visual comparison to avoid losing details in surface. The methods of \cite{reinhardt2017visual} and \cite{bhatacharya2011level} are adopted for sphere and surface rendering respectively.
@@ -363,15 +383,13 @@ Apart from the aforementioned flaws, ATS still serves as an equally reliable met
 
 \section{Conclusion}
 
-In this work, the author presents a novel asynchronous time stepping method for non-iterative SPH integration. Each particle is at each time given a dedicated time step size and no global synchronization barriers are introduced to avoid time wasted by waiting threads in previous works. To guarantee local consistency and support attribute computation, neighborhood reconstruction is done each time a particle is processed. A strict chronological processing order of the particles in the form of a priority queue is introduced to enhance stability. A multi-queue-based scheme is smartly devised for parallel execution of this fully asynchronous time integration method. In terms of efficiency, the proposed algorithm is capable of achieving a speedup factor of up to 7.5 and outperforms other tested methods under various scenarios using either serial or parallel execution. In terms of scalability and visual correctness, the respective tests yield some drawbacks of the integration scheme that could be further exploited:
+In this paper, the author presents a novel asynchronous time stepping method for non-iterative SPH integration. Each particle is at each time given a dedicated time step size and no global synchronization barriers are introduced to avoid time wasted by waiting threads in previous works. To guarantee local consistency and support attribute computation, neighborhood reconstruction is done each time a particle is processed. A strict chronological processing order of the particles in the form of a priority queue is introduced to enhance stability. A multi-queue-based scheme is smartly devised for parallel execution of this fully asynchronous time integration method. In terms of efficiency, the proposed algorithm is capable of achieving a speedup factor of up to 7.5 and outperforms other tested methods under various scenarios using either serial or parallel execution. In terms of scalability and visual correctness, the respective tests yield some drawbacks of the integration scheme that could be further exploited:
 
 \begin{itemize}
     \item With large proportions of barely moving fluid particles the algorithm's performance boost is undermined. Here the promising work of \cite{goswami2014regional} could be adopted so that the solver handles barely active particles as static ones.
     \item As pointed out by \cite{bender2010boundary}, the acceleration term in eq. \ref{eq7} dominates the speed term in non-iterative SPH simulation. A natural idea would be to devise a scheme such that the constants $ \lambda_{v} $ and $ \lambda_{F} $ are automatically adapted for the particles according to their neighborhood information.
     \item Compared to other tested models, asynchronous time stepping leads to higher velocity damping upon interaction with collision objects. Since the author only implemented a simple boundary handling scheme, in which the particles at domain boundaries are clipped in position, reversed in velocity and applied with a user-defined friction, such damping could be alleviated if a more complex boundary handling model is adopted.
 \end{itemize}
-
-
 
 \bibliographystyle{alpha}
 \bibliography{references}
