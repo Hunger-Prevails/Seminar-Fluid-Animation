@@ -76,11 +76,21 @@ Speeding up SPH simulations can also be achieved by exploiting parallelism:
 
 \section{Non-iterative SPH}
 
-Governed by the Navier-Stokes equation \eqref{eq1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A_{i} $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A_{j} $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic Euler or leap frog is carried out to update particle position and speed.
+Governed by the Navier-Stokes equation \eqref{eq1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A_{i} $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A_{j} $ over all neighboring particles j, with the weights given by a user-defined kernel function W that satisfies the following conditions:
+
+\begin{itemize}
+    \item The function has an integral value of one over its acting domain.
+    \item The function approximates the $ Dirac $-$ \delta $ distribution as its smoothing length approaches zero.
+    \item The function is non-negative.
+    \item The function is symmetric.
+    \item The function is of compact support (i.e. the function value remains zero beyond its smoothing length).
+\end{itemize}
+
+After all forces are computed, time integration methods like symplectic Euler or leap frog is carried out to update particle position and speed.
 
 \begin{equation}
 	\label{eq1}
-	\frac{\delta v}{\delta t} = -\frac{\nabla p}{\rho} + \nu v^{2} + \frac{F^{external}}{\rho}
+	\frac{\delta v}{\delta t} = -\frac{\nabla p}{\rho} + \nu \nabla^{2} v + \frac{F^{external}}{\rho}
 \end{equation}
 
 \subsection{SPH Procedure with splitting}
@@ -127,7 +137,7 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 \end{algorithm}
 \normalsize
 
-The advection force incurred by a particle consists of a viscosity component and some external components. The second-order spatial derivative of velocity reflects the diverging trend of the local velocity field and decides the viscosity component. But since second-order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
+The advection force incurred by a particle consists of a viscosity component and some external components. Viscosity forces counteract divergence of the velocity field and is hence calculated as the second-order spatial derivative of velocity. But since second-order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
 
 \begin{equation}
 	\label{eq2}
@@ -180,7 +190,7 @@ Despite the fact that multiple common numerical time integration schemes would f
 \end{split}
 \end{equation}
 
-where in addition to a first-order Taylor expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when using longer time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum step size for an individual particle is given by:
+where in addition to a first-order Taylor expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when applying larger time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum step size for an individual particle is given by:
 
 \begin{equation}
 	\label{eq7}
