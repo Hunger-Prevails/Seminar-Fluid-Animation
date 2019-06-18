@@ -28,7 +28,7 @@
 
 \section{Motivation}
 
-Over the years, the adoption of smoothed particle hydrodynamics(SPH) has developed to become the common pratice when simulating fluids in various scenes. In non-iterative approaches, the physical properties of a fluid particle is constantly influenced by its immediate neighborhood and is thereby updated in each time step following a few equations of state that helps compute the components in the Navier-Stokes equation. In these equations, the computation of new attributes of the current particle requires several times the access to information from its surrounding neighbors. Intuitively, a natural practice would be to, as did many non-iterative SPH solvers, perform global updates to all particles using a single uniform time step. While iterative SPH solvers nowadays generally yield better performances, traditional non-iterative approaches do not seem to lessen in popularity due to the fact that they are easy to implement and suitable for less turbulent fluids (see Fig. \ref{fig1}).
+Over the years, the adoption of smoothed particle hydrodynamics(SPH) has developed to become the common pratice when simulating fluids in various scenes. In non-iterative approaches, the physical properties of a fluid particle is constantly influenced by its immediate neighborhood and is thereby updated in each time step following a procedure that helps compute the respective components in the Navier-Stokes equation. In these equations, the computation of new attributes of the current particle requires several times the access to information from its surrounding neighbors. Intuitively, a natural practice would be to, as did many non-iterative SPH solvers, perform global updates to all particles using a single uniform step size. While iterative SPH solvers nowadays generally yield better performances, traditional non-iterative approaches do not seem to lessen in popularity due to the fact that they are easy to implement and suitable for less turbulent fluids (see Fig. \ref{fig1}).
 
 \begin{figure}[tb]
 	\centering
@@ -38,29 +38,29 @@ Over the years, the adoption of smoothed particle hydrodynamics(SPH) has develop
 \end{figure}
 
 \par
-Be that as it may, a core defect of non-iterative SPH solvers may lie in the lack of efficiency. On one hand, to enforce a constantly negligible density deviation within the fluid, large stiffness parameters are adopted to generate high pressures. Such selection of parameters demands smaller time steps and, in turn, a greater number of iterations for stable and correct particle interations. This can lead to tremendously higher overhead for the generation of visually realistic animation, where tens of millions of particles are included to allow for as fine-grained details as possible. On the other hand, the author made the observation that, while smaller time steps are essential in heavily interacting regions to guarantee stable simulation, in many less complex parts of the fluid a larger time step suffices (see Fig. \ref{fig2}). That is, the maximum possible time step for a particle varies substantially across different regions of the simulation, and it makes less sense to set one global time step for all particles, since it would inevitably be limited by the single particle with the strictest time constraint and lead to much waste of computational power. Previous works that attempted to tackle this aspect of the problem had to introduce some global synchronization barriers that improves consistency but somehow shadows the boost on performance due to waiting threads within parallel execution.
+Be that as it may, a core defect of non-iterative SPH solvers may lie in the lack of efficiency. On one hand, to enforce a constantly negligible density deviation within the fluid, large stiffness parameters are adopted to generate high pressures. Such selection of parameters demands smaller time steps and, in turn, a greater number of global iterations for stable and correct particle interations. This can lead to tremendously higher overhead for the generation of visually realistic animation, where tens of millions of particles are included to allow for as fine-grained details as possible. On the other hand, the paper made the observation that, while smaller time steps are essential in heavily interacting regions to guarantee stable simulation, in many less complex parts of the fluid the particles could do well with a larger time step (see Fig. \ref{fig2}). That is, the maximum possible step size for a particle varies substantially across different regions of the simulation, and it makes less sense to set one global step size for all particles, since it would inevitably be limited by the single particle with the strictest time constraint and lead to much waste of computational power. Previous works that attempted to tackle this aspect of the problem had to introduce some global synchronization barriers that improves consistency but somehow shadows the boost on performance due to waiting threads within parallel execution.
 
 \begin{figure}[tb]
 	\centering
 	\includegraphics[scale=0.25]{images/1}
-	\caption{\label{fig2} For fluid simulation based on SPH, the magnitude of velocity differs substantially across particles from different regions (right). As a result, the maximum possible time steps for each individual particle could diverge to cover up to multiple magnitudes (left) \cite{reinhardt2017fully}.}
+	\caption{\label{fig2} For fluid simulation based on SPH, the magnitude of velocity differs substantially across particles from different regions (right). As a result, the maximum possible step size for each individual particle could diverge to cover up to multiple magnitudes (left) \cite{reinhardt2017fully}.}
 \end{figure}
 
 \par
-To cope with this, the author proposes a novel method for the time integration of particles, in which each particle is assigned a individual time step and the whole simulation is carried out fully asynchronous. By handling each particle individually throughout the simulation, the solver expends less computational effort on smoother regions and considerably cut down the overall time consumption. To ensure consistency, the neighborhood is reconstructed at the current time stamp each time a particle is processed. To demonstrate the strength of the proposed method, the author further proposes a multi-queue parallelization to such fully asynchronous integration procedure. Comparative experiments against related works were conducted under diverse conditions and environments to prove the efficacious enhancement on performance.
+To cope with this, the paper proposes a novel method for the time integration of particles, in which each particle is assigned an individual step size and the whole simulation is carried out fully asynchronous. By handling each particle individually throughout the simulation, the solver expends less computational effort on smoother regions and considerably cut down the overall time consumption. To ensure consistency, the neighborhood is reconstructed at the current time stamp each time a particle is processed. To demonstrate the strength of the proposed method, the paper further proposes a multi-queue parallelization to such fully asynchronous integration procedure. Comparative experiments against related works were conducted under diverse conditions and environments to prove the efficacious enhancement on performance.
 
 \section{Related Work}
 
-Since the contribution of this paper focuses on the temporal adaptivity of SPH-based fluid simulations (i.e. how the time step size of SPH integration models could be adapted to enhance the performance of the simulation) and how the proposed method could be parallelized, we discuss related works in these two directions separately.
+Since the contribution of this paper focuses on the temporal adaptivity of SPH-based fluid simulations (i.e. how the step size of SPH integration models could be adapted to enhance the performance of the simulation) and how the proposed method could be parallelized, we discuss related works in these two directions separately.
 
 \subsection{Temporal Adaptivity}
 
 Extensive studies have been conducted on the temporal adaptivity of SPH models:
 
 \begin{itemize}
-    \item For synchronous SPH simulation, temporal adaptivity could be exploited as in \cite{desbrun1996smoothed}. For each global iteration they determine the uniform step size to be the maximum possible step size of the particle with the strictest CFL constraint. This scheme is also adopted by \cite{bender2010boundary}, who added an additional acceleration constraint as the second term.
+    \item For synchronous SPH simulation, temporal adaptivity could be exploited as in \cite{desbrun1996smoothed}. For each global iteration the uniform step size is determined by the particle with the strictest CFL constraint. This scheme is also adopted by \cite{bender2010boundary}, who added an additional acceleration constraint as the second term to take into consideration the impact of large forces.
     \item \cite{goswami2014regional} introduces a regionally synchronous integration model. They divide all particles into separate rigions depending on their maximum possible step size and fix a uniform step size for each region that is a multiple of the user-defined base value.
-    \item \cite{desbrun1996smoothed} explored the possibility to apply individual times steps. For each particle the user-defined simulation time step is divided by powers of two to the extent such that the CFL condition is met. Forces are evaluated only at individual time steps to facilitate gains in performance. \cite{ban2018adaptively} follows this idea and proposes a semi-synchronous time stepping scheme. They introduce the concept of a virtual system time line that advances with the smallest individual time step of all particles. Particles with an individual step size that exceeds the gap between its own time stamp and the system checkpoint are deactivated and only propagated forward using linear interpolation. Those that are active are instead evaluated in the same procedure as in the fully synchronous setting. Such a stepping strategy still introduces a great number of global synchronization barriers although the overall operations are cut down to some extent.
+    \item \cite{desbrun1996smoothed} explored the possibility to apply individual times steps. For each particle the user-defined simulation step size is divided by powers of two to the extent such that the CFL condition is met. Forces are evaluated only at individual time steps to facilitate gains in performance. \cite{ban2018adaptively} follows this idea and proposes a semi-synchronous time stepping scheme. They introduce the concept of a virtual system time line that advances with the smallest individual step size of all particles. Particles with an individual step size that exceeds the gap between its own time stamp and the system checkpoint are deactivated and only propagated forward using linear interpolation. Those that are active are instead evaluated in the same procedure as in the fully synchronous setting. Such a stepping strategy still introduces a great number of global synchronization barriers although the overall operations are cut down to some extent.
 \end{itemize}
 
 \subsection{Parallelism in SPH Simulation}
@@ -70,25 +70,25 @@ Speeding up SPH simulations can also be achieved by exploiting parallelism:
 \begin{itemize}
     \item For neighborhood search and access to particle properties, the community seems to have reached the consensus to utilize a uniform grid to facilitate concurrent queries of neighborhood information \cite{ihmsen2014sph}.
     \item For synchronous non-iterative SPH simulation, simple loop parallelization could be adopted, since several for-loops are responsible for computing the attributes of the particles in each global step.
-    \item For \cite{goswami2014regional}, parallel computation should be straightforward to implement as for each region the time step size is fixed. However, the solver could suffer from unbalanced load and the waiting threads since at the edge zones of the regions synchronization becomes inevitable.
+    \item For \cite{goswami2014regional}, parallel computation should be straightforward to implement as for each region the step size is fixed. However, the solver could suffer from unbalanced load and the waiting threads since at the edge zones of the regions synchronization becomes inevitable.
     \item For \cite{ban2018adaptively}, since in each global synchronization barrier the solver performs either full integration or linear interpolation on all particles, the parallelization scheme bears little difference to the fully synchronous setting.
 \end{itemize}
 
 \section{Non-iterative SPH}
 
-Governed by the Navier-Stokes equation \ref{eq1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A(x_{i}) $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A(x_{j}) $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic Euler or leap frog is carried out to update particle position and speed.
+Governed by the Navier-Stokes equation \eqref{eq1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A_{i} $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A_{j} $ over all neighboring particles j, with the weights given by a normalizing kernel function W that is of compact support. After all forces are computed, time integration methods like symplectic Euler or leap frog is carried out to update particle position and speed.
 
 \begin{equation}
 	\label{eq1}
 	\frac{\delta v}{\delta t} = -\frac{\nabla p}{\rho} + \nu v^{2} + \frac{F^{external}}{\rho}
 \end{equation}
 
-\subsection{Split Equations of State}
+\subsection{SPH Procedure with splitting}
 
-The author adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to represent the expected density at the end of this time step as a result of the divergence in the velocity field if no compensating pressure force is generated. pressures $ p $ pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
+The paper adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to represent the expected density at the end of this time step as a result of the divergence in the velocity field assuming no compensating pressure force is generated. pressures $ p $ and pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
 \par
 Conventionally, a single global update step with the concept of spitting applied proceeds as in Alg. \ref{alg1}. To interpolate particle properties a neighborhood search is conducted at each time step to fetch the set of neighbors for each particle. Since such operations can be computationally expensive, spatial data
-structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information. To further minimize time consumed by inevitable query operations at each time step, particles are sorted in accordance with their spatial cell. In this way, spatially adjacent particles are stored on adjacent memory slots, enhancing the cache-hit rates during the simulation. Here, the author chooses Z-order curve (see Fig. \ref{fig6}), a commonly used sorting function that effectively preserves spatial locality due to its fractal block structure, for particle indexing.
+structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information. To further minimize time consumed by inevitable query operations at each time step, particles are sorted in accordance with their spatial cell. In this way, spatially adjacent particles are stored on adjacent memory slots, enhancing the cache-hit rates during the simulation. Here, the paper chooses Z-order curve (see Fig. \ref{fig6}), a commonly used sorting function that effectively preserves spatial locality due to its fractal block structure, for particle indexing.
 
 \begin{figure}[tb]
 	\centering
@@ -134,7 +134,7 @@ The advection force incurred by a particle consists of a viscosity component and
 	F_{i}^{viscosity} = 2m_{i}\nu \sum_{j}\frac{m_{j}}{\rho_{j}}v_{ij}\frac{x_{ij} \cdot \nabla W_{ij}}{x_{ij}\cdot x_{ij} + 0.01h^{2}}
 \end{equation}
 
-where $ \nu $ is a hyperparameter describing the viscocity of the liquid. Since modeling boundary interations and surface tension is not a core theme of this paper, the author directly adopts the method of \cite{akinci2012versatile} and \cite{huber2015evaluation} to handle these two aspects of the advection force.
+where $ \nu $ describes the kinematic viscocity of the liquid. Since modeling boundary interations and surface tension is not a core theme of this paper, the paper directly adopts the method of \cite{akinci2012versatile} and \cite{huber2015evaluation} to handle these two aspects of the advection force.
 \par
 Based on the advection forces, intermediate advection velocity is computed as follows:
 
@@ -143,7 +143,7 @@ Based on the advection forces, intermediate advection velocity is computed as fo
 	v_{i}^{*} = v_{i}(t) + \delta t\frac{F_{i}^{advection}}{m_{i}}
 \end{equation}
 
-This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first-order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the author chooses the robust variant presented by \cite{monaghan1992smoothed} and computes the advection density via
+This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first-order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the paper chooses the robust variant presented by \cite{monaghan1992smoothed} and computes the advection density via
 
 \begin{equation}
 	\label{eq4}
@@ -163,38 +163,40 @@ where $ \rho_{0} $ is the system's reference density and k is the stiffness para
 
 \begin{equation}
 	\label{eq5}
-	F_{i}^{pressure} = -m_{i}\sum_{j}m_{j}(\frac{p_{i}}{(\rho_{i}^{*})^{2}} + \frac{p_{j}}{(\rho_{j}^{*})^{2}})\nabla W_{ij}
+	F_{i}^{pressure} = -m_{i}\sum_{j}m_{j}\left(\frac{p_{i}}{(\rho_{i}^{*})^{2}} + \frac{p_{j}}{(\rho_{j}^{*})^{2}}\right)\nabla W_{ij}
 \end{equation}
 
 This pressure force is then solely responsible for the explicit velocity and position update of the particle, which we discuss in the next subsection.
 
 \subsection{Time Integration}
 
-Despite the fact that multiple common numerical time integration schemes would fit well into the framework of non-iterative SPH solvers, the author employs a modified version of symplectic Euler:
+Despite the fact that multiple common numerical time integration schemes would fit well into the framework of non-iterative SPH solvers, the paper employs a modified version of symplectic Euler:
 
 \begin{equation}
+\begin{split}
 	\label{eq6}
-	v_{i}(t + \delta t) = v_{i}(t) + \delta	t\frac{F_{i}^{pressure}(t)}{m_{i}}
-	x_{i}(t + \delta t) = x_{i}(t) + \delta t v_{i}(t + \delta t) + \frac{\delta t^{2}}{2}\frac{F_{i}^{pressure}(t)}{m_{i}}
+	v_{i}(t + \delta t) &= v_{i}(t) + \delta t\frac{F_{i}^{pressure}(t)}{m_{i}} \\
+	x_{i}(t + \delta t) &= x_{i}(t) + \delta t v_{i}(t + \delta t) + \frac{\delta t^{2}}{2}\frac{F_{i}^{pressure}(t)}{m_{i}}
+\end{split}
 \end{equation}
 
-where in addition to a first-order tyler expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when using longer time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum time step for an individual particle is given by:
+where in addition to a first-order Taylor expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when using longer time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum step size for an individual particle is given by:
 
 \begin{equation}
 	\label{eq7}
 	\delta t_{i} = min(\lambda_{v}\frac{2r_{i}}{|v_{i}|}, \lambda_{F}\sqrt{\frac{2r_{i}}{F_{i}^{pressure}/m_{i}}})
 \end{equation}
 
-where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where a globally adaptive time step is used, the system-wide time step is naturally chosen to be minimum of \ref{eq7} over all particles.
+where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where a globally adaptive stepping scheme is used, the system-wide step size is naturally chosen to be minimum of Eq. \eqref{eq7} over all particles.
 
 
 \section{Fully Asynchronous SPH}
 
-As explained in previous sections, conventional approaches of fixed or globally adaptive time stepping squander computational resources on particles that could have been integrated with larger time steps. Former works that tries to mitigate the waste on computational power suffer from waiting threads since they introduce multiple times more synchronization barriers within the duration of the simulation. Therefore, the author proposes to assign to each individual particle a dedicated time step determined by eq. \ref{eq7} and avoid any global synchronization barrier. Only a virtual export barrier is employed from time to time to fetch particle states for rendering purposes. A comparative illustration of the proposed method is given in Fig. \ref{fig3}.
+As explained in previous sections, conventional approaches of fixed or globally adaptive time stepping squander computational resources on particles that could have been integrated with larger time steps. Former works that try to mitigate the waste on computational power suffer from waiting threads since they introduce multiple times more synchronization barriers within the duration of the simulation. Therefore, the paper proposes to assign to each individual particle a dedicated step size determined by Eq. \eqref{eq7} and avoid any global synchronization barrier. Only a virtual export barrier is employed from time to time to fetch particle states for rendering purposes. A comparative illustration of the proposed method is given in Fig. \ref{fig3}.
 
 \subsection{Sequential Execution of Asynchronous Simulation}
 
-To achieve such asynchronous SPH simulation, the solver has to constantly ensure that particle $ i $ that currently being processed has immediate access to the attributes $ A(x_{j}) $ of neighboring particles $ j $ at time stamp $ t_{i} $. Since all particles advance through time independently, this can only be achieved if the attributes of neighboring particles can be temporally interpolated. Fortunately, by employing the splitting concept, the non-iterative SPH integration already provides a feasible way to conduction such reconstruction efficiently.
+To achieve such asynchronous SPH simulation, the solver has to constantly ensure that particle $ i $ that currently being processed has immediate access to the attributes $ A_{j} $ of neighboring particles $ j $ at time stamp $ t_{i} $. Since all particles advance through time independently, this can only be achieved if the attributes of neighboring particles can be temporally interpolated. Fortunately, by employing the splitting concept, the non-iterative SPH integration already provides a feasible way to conduct such reconstruction efficiently.
 
 \begin{figure}[tb]
 	\centering
@@ -206,12 +208,12 @@ To achieve such asynchronous SPH simulation, the solver has to constantly ensure
 Similar to Alg. \ref{alg1}, one step of integration for an individual particle has the following dependencies:
 
 \begin{itemize}
-    \item the viscosity force $ F_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ is dependent on the positions $ x_{j}(t_{i}) $ and velocities $ v_{j}(t_{i}) $ of neighboring particles $j$.
-    \item the advection density $ \rho_{i}^{*} $ of particle $i$ is dependent on the advection velocities $ v_{j}^{*} $ of neighboring particles $j$.
-    \item the pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ is dependent on the advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighboring particles $j$.
+    \item The viscosity force $ F_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ is dependent on the positions $ x_{j}(t_{i}) $ and velocities $ v_{j}(t_{i}) $ of neighboring particles $j$.
+    \item The advection density $ \rho_{i}^{*} $ of particle $i$ is dependent on the advection velocities $ v_{j}^{*} $ of neighboring particles $j$.
+    \item The pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ is dependent on the advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighboring particles $j$.
 \end{itemize}
 
-Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ v_{j} $ and positions $ x_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in eq. \ref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ v_{j}^{*} $ of neighboring particles could be costly, we may assume that the author replaces $ v_{j}^{*}(t_{i}) $ with $ v_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step. An illustration of the neighborhood reconstruction scheme is given in Fig. \ref{fig4}.
+Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ v_{j} $ and positions $ x_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in Eq. \eqref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ v_{j}^{*} $ of neighboring particles could be costly, we may assume that the paper replaces $ v_{j}^{*}(t_{i}) $ with $ v_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step. An illustration of the neighborhood reconstruction scheme is given in Fig. \ref{fig4}.
 
 \large
 \begin{algorithm}
@@ -224,20 +226,20 @@ Since velocity and position can be directly pushed forth or back in time under t
 	\caption{\label{alg2} One individual step in ATS \cite{reinhardt2017fully}}
 	\SetKwProg{Fn}{Function}{:}{}
 	\Fn{\FMain{particle $i$}}{
-		determine maximum possible time step $ \delta t_{i} $\;
+		determine maximum possible step size $ \delta t_{i} $\;
 		\;
 		reconstruct velocities $ v_{j}(t_{i}) $ and positions $ x_{j}(t_{i}) $ of neighbors $j$ at $t_{i}$\;
 		\;
-		compute viscosity force $ F_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ using eq. \ref{eq2}\;
+		compute viscosity force $ F_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ using Eq. \eqref{eq2}\;
 		compute external forces $ F_{i}^{ext}(t_{i}) $ incurred by particle $i$\;
 		compute advection force $ F_{i}^{*}(t_{i}) $ incurred by particle $i$\;
-		compute advection velocity $ v_{i}^{*}(t_{i}) $ of particle $i$ using eq. \ref{eq3}\;
-		compute advection density $ \rho_{i}^{*} $ of particle $i$ using eq. \ref{eq4}\;
-		compute pressure $ p_{i} $ of particle $i$ using eq. \ref{eq8}\;
+		compute advection velocity $ v_{i}^{*}(t_{i}) $ of particle $i$ using Eq. \eqref{eq3}\;
+		compute advection density $ \rho_{i}^{*} $ of particle $i$ using Eq. \eqref{eq4}\;
+		compute pressure $ p_{i} $ of particle $i$ using Eq. \eqref{eq8}\;
 		\;
 		reconstruct advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighbors $j$ at $t_{i}$\;
 		\;
-		compute pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ using eq. \ref{eq5}\;
+		compute pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ using Eq. \eqref{eq5}\;
 		\;
 		integrate particle $i$ over time using $ \delta t_{i} $\;
 	}
@@ -250,11 +252,11 @@ Since velocity and position can be directly pushed forth or back in time under t
 	\caption{\label{fig4} Illustration of the neighborhood reconstruction scheme: attributes of neighbors of particle $p_{3}$ are traced back in time to support the computations at the current time step. A particle is processed only when all its neighbors are already temporally ahead of itself. In this particular scenario particle $ p_{4} $ reaches the head of the priority queue after particle $p_{3}$ finishes its individual step \cite{reinhardt2017fully}.}
 \end{figure}
 
-To guarantee stable and correct behavior of the algorithm, the author stipulates empirically that the attributes of neighboring particles should only be traced back in time. In other words, a particle is only to be processed if its entire neighborhood is more advanced in time than itself. To explicitly enforce such strict processing order, a priority queue storing only particle indices is introduced to constantly arange the particles in chronological order. Specificaly, until the next virtual export barrier is reached, the solver repeatedly dequeues the particle at the top of queue, performs one individual step for the particle and then inserts its index back into the queue such that the chronological order within the queue is sustained. After the last particle reaches the next virtual export barrier $t_{exp}$, the attributes of all particles that are demanded by the rendering process are reconstructed at $t_{exp}$ using the same procedure as stated above.
+To guarantee stable and correct behavior of the algorithm, the paper stipulates empirically that the attributes of neighboring particles should only be traced back in time. In other words, a particle is only to be processed if its entire neighborhood is more advanced in time than itself. To explicitly enforce such strict processing order, a priority queue storing only particle indices is introduced to constantly arange the particles in chronological order. Specificaly, until the next virtual export barrier is reached, the solver repeatedly dequeues the particle at the top of queue, performs one individual step for the particle and then inserts its index back into the queue such that the chronological order within the queue is sustained. After the last particle reaches the next virtual export barrier $t_{exp}$, the attributes of all particles that are demanded by the rendering process are reconstructed at $t_{exp}$ using the same procedure as stated above.
 
 \subsection{Parallelization}
 
-A parallel implementation of the aforementioned time stepping scheme is not straightforward given the restriction on processing order. Naively spawning multiple queues and handling them independently would lead to violation of the ordinal constraint. Adopting simple synchronization strategies could cause multiple threads to be stuck at each other when several particles have neighbors in other queues that lag behind in time, which could force their belonging queues to hang up until the ordinal constraint is fulfilled. To cope with this undesirably inherent character of the devised approach, the author introduces per queue a waiting list as the buffer area. When the solver of a queue runs into a particle that violates the ordinal constraint, this particle is removed and pushed into the waiting list (see Fig. \ref{fig5}). The solver then goes on to process the particle at the top of the queue until a predefined interval is reached and all particles in the waiting list are reinserted into the queue. Alg. \ref{alg3} describes the running process of a priority queue.
+A parallel implementation of the aforementioned time stepping scheme is not straightforward given the restriction on processing order. Naively spawning multiple queues and handling them independently would lead to violation of the ordinal constraint. Adopting simple synchronization strategies could cause multiple threads to be stuck at each other when several particles have neighbors in other queues that lag behind in time, which could force their belonging queues to hang up until the ordinal constraint is fulfilled. To cope with this undesirably inherent character of the devised approach, the paper introduces per queue a waiting list as the buffer area. When the solver of a queue runs into a particle that violates the ordinal constraint, this particle is removed and pushed into the waiting list (see Fig. \ref{fig5}). The solver then goes on to process the particle at the top of the queue until a predefined interval is reached and all particles in the waiting list are reinserted into the queue. Alg. \ref{alg3} describes the running process of a priority queue.
 
 \begin{figure}[tb]
 	\centering
@@ -273,21 +275,21 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 	\SetKwFunction{FMain}{RunQueue}
 	\SetKwProg{Fn}{Function}{:}{}
 	\Fn{\FMain{queue $q$, time stamp $ t_{exp} $}}{
-		Initialize waiting list wl\;
-		Initialize step count cnt\;
+		Initialize waiting list $ wl $\;
+		Initialize step count $ cnt $\;
 		\While{$ t_{q.top()} <  t_{exp} $}{
 			$i$ = q.pop()\;
 			find all neighbors $j$ of particle $i$\;
 			\uIf{$ t_{i} < t_{j} $ for all neighbors $j$ of particle $i$}{
 				IndividualStep(i)\;
-				$ t_{i} += \delta t_{i} $\;
+				$ t_{i} = \delta t_{i} + 1$\;
 				compute $ \delta t_{i} $ for next iteration\;
 				q.push(i)\;
 			}
 			\Else{
 				wl.push(i)\;
 			}
-			$ cnt += 1 $\;
+			$ cnt = cnt + 1 $\;
 			\uIf{cnt == INTERVAL}{
 				insert all particles k in wl into queue\;
 				empty wl\;
@@ -297,26 +299,25 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 \end{algorithm}
 \normalsize
 
-\paragraph{comment}
 The proposed parallelization scheme presupposes a few conditions to ensure its efficiency. To justify the feasibility of the approach, we need to investigate a few implementation details with discretion.
 
-\subparagraph{step size clipping}
+\paragraph{Step size clipping}
 Despite global synchronization barriers are avoided throughout the simulation, in practice it still helps to clip the invididual time steps to be a multiple of 0.5 ms as in \cite{goswami2014regional}: Chances are high that spatially adjacent particles tend to be assigned the same step size. When a particle has a neighbor that is equally advanced in time thanks to this clipping operation, the reconstruction of this particular neighbor could be omitted. This could be a huge drop in amount operations for interaction-intensive regions.
 
-\subparagraph{maintenance of neighborhood information}
+\paragraph{Maintenance of neighborhood information}
 To grant efficient query and update of particle neighbors, a uniform grid storing the cells in a one-dimensional array using Z-curve indexing is employed. Since the full construction of such spatial data structure induces a high computational expenditure, a global update of all grid cells is only carried out at each virtual export barrier. To ensure the correctness of a usual neighborhood search implementation, the particles have to be monitored each time they advance in space and time. If a particle changes cell after one individual step, a reference to the particle is instantly added to the new cell without removing the old reference. This is to deal with cases where one neighbor $j$ of a particle $i$ is no longer in $i$'s vicinity after advancing but by the current time stamp $t_{i}$ it still was and should contribute to particle $i$'s attribute computation. Since the kernel function is of compact support, such cell update strategy does not lead to false neighbors and only induces a small extra cost.
 
-\subparagraph{queue splitting}
-Since a Z-curve indexing of the particle arrays is employed, spatially close particles are assigned to the same queues by simply splitting the queues by particle index. Such property is desirable in the sense that if a particle has too many neighbors that appear in other queues it would inevitably be frequently put into the waiting list. Nevertheless as particles travel during the simulation, such spatial separation is detrimented. The author proposes to reinitialize the queues after several virtual export barriers to improve spatial clustering among the particles. Empirically, a reinitialization of the queues is done every half of a second, which serves as a good trade-off between the overhead of reconstructing queues and postponing too many particles that violate the strict particle processing order.
+\paragraph{Queue splitting}
+Since a Z-curve indexing of the particle arrays is employed, spatially close particles are assigned to the same queues by simply splitting the queues by particle index. Such property is desirable in the sense that if a particle has too many neighbors that appear in other queues it would inevitably be frequently put into the waiting list. Nevertheless as particles travel during the simulation, such spatial separation is detrimented. The paper proposes to reinitialize the queues after several virtual export barriers to improve spatial clustering among the particles. Empirically, a reinitialization of the queues is done every half of a second, which serves as a good trade-off between the overhead of reconstructing queues and postponing too many particles that violate the strict particle processing order.
 
-\subparagraph{waiting list handling}
+\paragraph{Waiting list handling}
 Detemining the interval to reinsert the postponed particles back into the queue is of vital significance. An interval too small would lead to postponing these violating particles multiple times while a restoration too late would mean to postpone their neighbors in other queues and result in threads stuck at each other. An optimal choice of this hyperparameter relies heavily on the complexity of the scene and is hence done empirically.
 
 \section{Experiments}
 In this section, comparative experiments against previous methods including fixed time stepping (FTS), globally adaptive time stepping (GTS) \cite{desbrun1996smoothed} and individual stepping (ITS) \cite{ban2018adaptively} are conducted to demonstrate the boost on performance for the proposed method. Particles are rendered as spheres for visual comparison to avoid losing details in surface. The methods of \cite{reinhardt2017visual} and \cite{bhatacharya2011level} are adopted for sphere and surface rendering respectively.
 
 \subsection{Performance Study}
-To focus on high performance, the largest possible time step size that still maintains a stable simulation is used in all scenarios. Serial execution of all four methods are tested on two Corner-Dam-Break (CDB) scenes with 27k particles (in a cube of 30 x 30 x 30) and 125k particles (in a cube of 50 x 50 x 50) respectively. For parallel execution, three additional larger scenes are included to fully demonstrate the performance and scalability of the methods:
+To focus on high performance, the largest possible step size that still maintains a stable simulation is used in all scenarios. Serial execution of all four methods are tested on two Corner-Dam-Break (CDB) scenes with 27k particles (in a cube of 30 x 30 x 30) and 125k particles (in a cube of 50 x 50 x 50) respectively. For parallel execution, three additional larger scenes are included to fully demonstrate the performance and scalability of the methods:
 
 \begin{itemize}
     \item A Radial-Flow (RF) scene. This scene features a radial force field that, serving as an external force, drives the fluid particles and generates a vortex flow. A rigid body is placed in the fluid to disturb the flow. The whole scenario consists of 300k fluid and 20k boundary particles.
@@ -344,7 +345,7 @@ To focus on high performance, the largest possible time step size that still mai
 	\caption{\label{tab1} Performance comparison on various scenarios \cite{reinhardt2017fully}. Runtimes are measured in seconds.}
 \end{table}
 
-Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping methods under different scenerios. Judging from the outcome of the experiments, ATS outperforms all the other methods using either serial or parallel execution while maintaining a stable and realistic silmulation (see Fig. \ref{fig7}). It can be observed that the speedup factor increases as expected when the scale of the scene is enlarged. This is mainly due to the fact that the additional workload induced by handling the waiting list tend to be less influential compared to the overall computational cost when larger amount of particles are included. There is however one thing worth noting: Despite ATS still yields the best performance in the Fountain scenario, the speedup factor turns out to be less impressive than other scenes. The author attributes the decline in performance to a lack of interation in the scene: As the fountain scenario contains a large amount of almost static particles, the speedup gained with individual time steps becomes less decisive.
+Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping methods under different scenerios. Judging from the outcome of the experiments, ATS outperforms all the other methods using either serial or parallel execution while maintaining a stable and realistic silmulation (see Fig. \ref{fig7}). It can be observed that the speedup factor increases as expected when the scale of the scene is enlarged. This is mainly due to the fact that the additional workload induced by handling the waiting list tend to be less influential compared to the overall computational cost when larger amount of particles are included. There is however one thing worth noting: Despite ATS still yields the best performance in the Fountain scenario, the speedup factor turns out to be less impressive than other scenes. The paper attributes the decline in performance to a lack of interation in the scene: As the fountain scenario contains a large amount of almost static particles, the speedup gained with individual time steps becomes less decisive.
 
 \begin{figure}[tb]
 	\centering
@@ -359,7 +360,7 @@ Tab. \ref{tab1} exhibits the runtime and speedup factor of all four stepping met
 \end{figure}
 
 \subsection{Scaling Study}
-Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The author conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test measures the overall computation time to obtain the relative speedup when using up to six cores for the same task. The set of experiments are carried out on the Corner-Dam-Break scene with 125k particles. The left of Fig. \ref{fig8} shows the scaling curves obtained for various approaches. ATS scales slightly worse than other methods since inevitable extra work for parallelization is employed. Nevertheless, the difference get smaller as an increasing number of cores are put into use. The author attributes this phenomenon to the fact that all the other methods employ simple loop parallelization: They introduce a large number of synchronization barriers into the simulation. As the number of cores grow, the solver suffers from waiting threads at such barriers and fails to maintain the relative speedup. On the other hand, weak scaling performance is worth investigating for large-scale scenarios. To this end, the author includes a fixed number of 10k particles per core in a Corner-Dam-Break scene and examines how parallelism influences the overall simulation time as increasingly more cores are introduced. As shown in Fig. \ref{fig8} (right), ATS outperforms all other methods under this test setting. As discussed above, such an outcome could be expected since the overhead introduced by queue handling in ATS becomes negligible compared to neighborhood search and the particle attribute computations when handling larger number of particles.
+Another important aspect for the analysis of different time stepping models lies in their scalability. That is, how does per-thread performance change as increasingly more processing power becomes available for the solver during parallel execution? The paper conducts both strong scaling and weak scaling experiments in a comparative fashion to investigate the scalability of ATS compared to other methods. The strong scaling test measures the overall computation time to obtain the relative speedup when using up to six cores for the same task. The set of experiments are carried out on the Corner-Dam-Break scene with 125k particles. The left of Fig. \ref{fig8} shows the scaling curves obtained for various approaches. ATS scales slightly worse than other methods since inevitable extra work for parallelization is employed. Nevertheless, the difference get smaller as an increasing number of cores are put into use. The paper attributes this phenomenon to the fact that all the other methods employ simple loop parallelization: They introduce a large number of synchronization barriers into the simulation. As the number of cores grow, the solver suffers from waiting threads at such barriers and fails to maintain the relative speedup. On the other hand, weak scaling performance is worth investigating for large-scale scenarios. To this end, the paper includes a fixed number of 10k particles per core in a Corner-Dam-Break scene and examines how parallelism influences the overall simulation time as increasingly more cores are introduced. As shown in Fig. \ref{fig8} (right), ATS outperforms all other methods under this test setting. As discussed above, such an outcome could be expected since the overhead introduced by queue handling in ATS becomes negligible compared to neighborhood search and the particle attribute computations when handling larger number of particles.
 
 \begin{figure}[tb]
 	\centering
@@ -368,30 +369,30 @@ Another important aspect for the analysis of different time stepping models lies
 \end{figure}
 
 \subsection{Visual Comparison}
-The author make some visual comparisons on the generated animations to qualitatively analyze the behavior of fluid particles. In particular, it is noticed that ATS dampens the fluid velocities to a small extent where interaction occurs. In the Radial-Flow scene such damping effect may be observed in the disturbed flow regions around the collision object \ref{fig7}. But since an external force field constantly exerts action on the particles, such minor difference fade out soon after the collision. However, in scenarios where no external driving forces occur, such damping leads to visually obvious discrepancies in particle behavior. In the Fountain scenario \ref{fig9}, due to dampened velocities, particles that fall down after collision with the cone form an almost symmetric waterfall that is considerably smaller in size. Additionally, the particles that are propelled upwards at the top of the cone reach only lower heights.
+The paper make some visual comparisons on the generated animations to qualitatively analyze the behavior of fluid particles. In particular, it is noticed that ATS dampens the fluid velocities to a small extent where interaction occurs. In the Radial-Flow scene such damping effect may be observed in the disturbed flow regions around the collision object \ref{fig7}. But since an external force field constantly exerts action on the particles, such minor difference fade out soon after the collision. However, in scenarios where no external driving forces occur, such damping leads to visually obvious discrepancies in particle behavior. In the Fountain scenario \ref{fig9}, due to dampened velocities, particles that fall down after collision with the cone form an almost symmetric waterfall that is considerably smaller in size. Additionally, the particles that are propelled upwards at the top of the cone reach only lower heights.
 \par
-To analyze this effect, the author computes over time the mean velocity magnitudes of particles in the collision area for both scenes. In the Radial-Flow scenario only particles near the bunny are investigated and in the Fountain test only particles above the pond. The obtained curve is plotted in Fig. \ref{fig10}. Overall, the difference between velocity damping across various time stepping schemes coincide with previous visual inspection. It is worth noting in the Fountain test however, that in ATS the particles only experienced decelerations after initial impact with the cone, implying that proposed asynchronous stepping method does not seem to handle the interactions between fluid particles very well. In this regard, perhaps further improvements on the time integration scheme of the method could be explored.
+To analyze this effect, the paper computes over time the mean velocity magnitudes of particles in the collision area for both scenes. In the Radial-Flow scenario only particles near the bunny are investigated and in the Fountain test only particles above the pond. The obtained curves are plotted in Fig. \ref{fig10}. Overall, the difference between velocity damping across various time stepping schemes coincide with previous visual inspection. It is worth noting in the Fountain test however, that in ATS the particles only experienced decelerations after initial impact with the cone, implying that proposed asynchronous stepping method does not seem to handle the interactions between fluid particles very well. In this regard, perhaps further improvements on the time integration scheme of the method could be explored.
 \par
 Apart from the aforementioned flaws, ATS still serves as an equally reliable method to generate visually appealing fluid animation. Especially in regions where heavy interactions occur, the simulation remains stable and the particles travel smoothly even when the largest possible $ \lambda_{v} $ and $ \lambda_{F} $ constants are used.
 
 \begin{figure}[tb]
 	\centering
 	\includegraphics[scale=0.2]{images/10}
-	\caption{\label{fig9} Quantitative comparison on the mean velocities of interacting particles in the Radial-Flow scene (left) and Fountain scene (right) \cite{reinhardt2017fully}. In both scenes, ATS demonstrate the most obvious damping effect among all tested methods.}
+	\caption{\label{fig10} Quantitative comparison on the mean velocities of interacting particles in the Radial-Flow scene (left) and Fountain scene (right) \cite{reinhardt2017fully}. In both scenes, ATS demonstrate the most obvious damping effect among all tested methods.}
 \end{figure}
 
 
 \section{Conclusion}
 
-In this paper, the author presents a novel asynchronous time stepping method for non-iterative SPH integration. Each particle is at each time given a dedicated time step size and no global synchronization barriers are introduced to avoid time wasted by waiting threads in previous works. To guarantee local consistency and support attribute computation, neighborhood reconstruction is done each time a particle is processed. A strict chronological processing order of the particles in the form of a priority queue is introduced to enhance stability. A multi-queue-based scheme is smartly devised for parallel execution of this fully asynchronous time integration method. In terms of efficiency, the proposed algorithm is capable of achieving a speedup factor of up to 7.5 and outperforms other tested methods under various scenarios using either serial or parallel execution. In terms of scalability and visual correctness, the respective tests yield some drawbacks of the integration scheme that could be further exploited:
+In this paper, the paper presents a novel asynchronous time stepping method for non-iterative SPH integration. Each particle is at each time given a dedicated step size and no global synchronization barriers are introduced to avoid time wasted by waiting threads in previous works. To guarantee local consistency and support attribute computation, neighborhood reconstruction is done each time a particle is processed. A strict chronological processing order of the particles in the form of a priority queue is introduced to enhance stability. A multi-queue-based scheme is smartly devised for parallel execution of this fully asynchronous time integration method. In terms of efficiency, the proposed algorithm is capable of achieving a speedup factor of up to 7.5 and outperforms other tested methods under various scenarios using either serial or parallel execution. In terms of scalability and visual correctness, the respective tests yield some drawbacks of the integration scheme that could be further exploited:
 
 \begin{itemize}
     \item With large proportions of barely moving fluid particles the algorithm's performance boost is undermined. Here the promising work of \cite{goswami2014regional} could be adopted so that the solver handles barely active particles as static ones.
-    \item As pointed out by \cite{bender2010boundary}, the acceleration term in eq. \ref{eq7} dominates the speed term in non-iterative SPH simulation. A natural idea would be to devise a scheme such that the constants $ \lambda_{v} $ and $ \lambda_{F} $ are automatically adapted for the particles according to their neighborhood information.
-    \item Compared to other tested models, asynchronous time stepping leads to higher velocity damping upon interaction with collision objects. Since the author only implemented a simple boundary handling scheme, in which the particles at domain boundaries are clipped in position, reversed in velocity and applied with a user-defined friction, such damping could be alleviated if a more complex boundary handling model is adopted.
+    \item As pointed out by \cite{bender2010boundary}, the acceleration term in Eq. \eqref{eq7} dominates the speed term in non-iterative SPH simulation. A natural idea would be to devise a scheme such that the constants $ \lambda_{v} $ and $ \lambda_{F} $ are automatically adapted for the particles according to their neighborhood information.
+    \item Compared to other tested models, asynchronous time stepping leads to higher velocity damping upon interaction with collision objects. Since the paper only implemented a simple boundary handling scheme, in which the particles at domain boundaries are clipped in position, reversed in velocity and applied with a user-defined friction, such damping could be alleviated if a more complex boundary handling model is adopted.
 \end{itemize}
 
 \bibliographystyle{alpha}
 \bibliography{references}
 
-\end{document}          
+\end{document}
