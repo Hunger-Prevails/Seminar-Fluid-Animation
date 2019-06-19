@@ -76,7 +76,7 @@ Speeding up SPH simulations can also be achieved by exploiting parallelism:
 
 \section{Non-iterative SPH}
 
-Governed by the Navier-Stokes equation \eqref{eq1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A_{i} $ of particle i at position $ x_{i} $ is computed as the weighted sum of  $ A_{j} $ over all neighboring particles j, with the weights given by a user-defined kernel function W that satisfies the following conditions:
+Governed by the Navier-Stokes equation \eqref{eq1}, non-iterative SPH performs interpolation over the neighborhood of a particle to calculate its attributes and ultimately the forces it incurs within one time step of the simulation. The fluid attribute $ A_{i} $ of particle i at position $ \boldsymbol{x}_{i} $ is computed as the weighted sum of  $ A_{j} $ over all neighboring particles j, with the weights given by a user-defined kernel function W that satisfies the following conditions:
 
 \begin{itemize}
     \item The function has an integral value of one over its acting domain.
@@ -86,16 +86,18 @@ Governed by the Navier-Stokes equation \eqref{eq1}, non-iterative SPH performs i
     \item The function is of compact support (i.e. the function value remains zero beyond its smoothing length).
 \end{itemize}
 
-After all forces are computed, time integration methods like symplectic Euler or leap frog is carried out to update particle position and speed.
+After all forces are computed, time integration methods like symplectic Euler or leap frog is carried out to update particle position and speed. Denoting with $p$ the pressure, $\boldsymbol{v}$ the velocity and $\rho$ the density of a particle, a typical formulation of the Navier-Stokes equation models the acceleration of a particle as
 
 \begin{equation}
 	\label{eq1}
-	\frac{\delta v}{\delta t} = -\frac{\nabla p}{\rho} + \nu \nabla^{2} v + \frac{F^{external}}{\rho}
+	\frac{\delta \boldsymbol{v}}{\delta t} = -\frac{\nabla p}{\rho} + \nu \nabla^{2} \boldsymbol{v} + \frac{\boldsymbol{F}^{external}}{\rho},
 \end{equation}
+
+where $ \nu $ is the kinematic viscocity of the liquid and the three terms on the right hand side of the equation describes per unit volume the impact of pressure forces, viscosity forces and external forces respectively. 
 
 \subsection{SPH Procedure with splitting}
 
-The paper adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ F^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ v^{*} $. An advection density $ \rho^{*} $ is introduced to represent the expected density at the end of this time step as a result of the divergence in the velocity field assuming no compensating pressure force is generated. pressures $ p $ and pressure forces $ F^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
+The paper adopts here the splitting strategy as described by \cite{ihmsen2014sph}, where for each update step the advection forces $ \boldsymbol{F}^{advection} $ are separately computed and then used to calculate an intermediate advection velocity $ \boldsymbol{v}^{*} $. An advection density $ \rho^{*} $ is introduced to represent the expected density at the end of this time step as a result of the divergence in the velocity field assuming no compensating pressure force is generated. pressures $ p $ and pressure forces $ \boldsymbol{F}^{pressure} $ are afterwards handled conventionally. This updating scheme forces the solver to implicitly consider the impact of advection forces before generating pressure forces to counteract the deviation of density and therefore stablizes the simulation.
 \par
 Conventionally, a single global update step with the concept of spitting applied proceeds as in Alg. \ref{alg1}. To interpolate particle properties a neighborhood search is conducted at each time step to fetch the set of neighbors for each particle. Since such operations can be computationally expensive, spatial data
 structures(e.g. a uniform grid) that supports parallel operations are usually constructed at the beginning to accelerate the process. At each global step, the grid cells are queried and updated to efficiently maintain neighborhood information. To further minimize time consumed by inevitable query operations at each time step, particles are sorted in accordance with their spatial cell. In this way, spatially adjacent particles are stored on adjacent memory slots, enhancing the cache-hit rates during the simulation. Here, the paper chooses Z-order curve (see Fig. \ref{fig6}), a commonly used sorting function that effectively preserves spatial locality due to its fractal block structure, for particle indexing.
@@ -121,59 +123,59 @@ structures(e.g. a uniform grid) that supports parallel operations are usually co
 			find neighbors j\;
 		}
 		\For{each particle i}{
-			compute advection force $ F_{i}^{*} = F_{i}^{viscosity} + F_{i}^{ext} $\;
-			compute advection velocity $ v_{i}^{*} $ using $ F_{i}^{*} $\;
+			compute advection force $ \boldsymbol{F}_{i}^{*} = \boldsymbol{F}_{i}^{viscosity} + \boldsymbol{F}_{i}^{ext} $\;
+			compute advection velocity $ \boldsymbol{v}_{i}^{*} $ using $ \boldsymbol{F}_{i}^{*} $\;
 		}
 		\For{each particle i}{
 			compute advection density $ \rho_{i}^{*} $\;
 			compute pressure $ p_{i} $\;
 		}
 		\For{each particle i}{
-			compute pressure force $ F_{i}^{*} $\;
-			compute new particle velocity $ v_{i}(t + \delta t) $\;
-			compute new particle position $ x_{i}(t + \delta t) $\;
+			compute pressure force $ \boldsymbol{F}_{i}^{*} $\;
+			compute new particle velocity $ \boldsymbol{v}_{i}(t + \delta t) $\;
+			compute new particle position $ \boldsymbol{x}_{i}(t + \delta t) $\;
 		}
 	}
 \end{algorithm}
 \normalsize
 
-The advection force incurred by a particle consists of a viscosity component and some external components. Viscosity forces counteract divergence of the velocity field and is hence calculated as the second-order spatial derivative of velocity. But since second-order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
+The advection force incurred by a particle consists of a viscosity component and some external components. Viscosity forces counteract divergence of the velocity field and is hence proportional to the second-order spatial derivative of velocity. But since second-order derivatives are tricky to compute, the approximation form proposed originally by \cite{monaghan1992smoothed} is prefered instead. Therefore the viscosity component acting on particle i is computed as
 
 \begin{equation}
 	\label{eq2}
-	F_{i}^{viscosity} = 2m_{i}\nu \sum_{j}\frac{m_{j}}{\rho_{j}}v_{ij}\frac{x_{ij} \cdot \nabla W_{ij}}{x_{ij}\cdot x_{ij} + 0.01h^{2}}
+	\boldsymbol{F}_{i}^{viscosity} = 2m_{i}\nu \sum_{j}\frac{m_{j}}{\rho_{j}}\boldsymbol{v}_{ij}\frac{\boldsymbol{x}_{ij} \cdot \nabla W_{ij}}{\boldsymbol{x}_{ij}\cdot \boldsymbol{x}_{ij} + 0.01h^{2}},
 \end{equation}
 
-where $ \nu $ describes the kinematic viscocity of the liquid. Since modeling boundary interations and surface tension is not a core theme of this paper, the paper directly adopts the method of \cite{akinci2012versatile} and \cite{huber2015evaluation} to handle these two aspects of the advection force.
+where $m_{i}$ denotes the mass of particle i, $\boldsymbol{v}_{ij} = \boldsymbol{v}_{i} - \boldsymbol{v}_{j}$ and $\boldsymbol{x}_{ij} = \boldsymbol{x}_{i} - \boldsymbol{x}_{j}$. Since modeling boundary interations and surface tension is not a core theme of this paper, the paper directly adopts the method of \cite{akinci2012versatile} and \cite{huber2015evaluation} to handle these two aspects of the advection force.
 \par
-Based on the advection forces, intermediate advection velocity is computed as follows:
+Based on the advection forces, intermediate advection velocity is computed as
 
 \begin{equation}
 	\label{eq3}
-	v_{i}^{*} = v_{i}(t) + \delta t\frac{F_{i}^{advection}}{m_{i}}
+	\boldsymbol{v}_{i}^{*} = \boldsymbol{v}_{i}(t) + \delta t\frac{\boldsymbol{F}_{i}^{advection}}{m_{i}}.
 \end{equation}
 
 This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first-order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the paper chooses the robust variant presented by \cite{monaghan1992smoothed} and computes the advection density via
 
 \begin{equation}
 	\label{eq4}
-	\rho_{i}^{*} = \sum_{j}m_{j}W_{ij} + \delta t_{i}\sum_{j}(v_{i}^{*} - v_{j}^{*})\cdot \nabla W_{ij}
+	\rho_{i}^{*} = \sum_{j}m_{j}W_{ij} + \delta t_{i}\sum_{j}(\boldsymbol{v}_{i}^{*} - \boldsymbol{v}_{j}^{*})\cdot \nabla W_{ij},
 \end{equation}
 
-where the first term describes the static density at particle position $ x_{i} $ and the second term describes the density change during step $ \delta t_{i} $ as a consequence of diverging velocity field.
+where the first term describes the static density at particle position $ \boldsymbol{x}_{i} $ and the second term describes the density change during step $ \delta t_{i} $ as a consequence of diverging velocity field.
 \par
-Having obtained the advection densities of the particles, pressure at particle position $ x_{i} $ is computed as
+Having obtained the advection densities of the particles, pressure at particle position $ \boldsymbol{x}_{i} $ is computed as
 
 \begin{equation}
 	\label{eq8}
-	p_{i} = k(\rho_{i}^{*} - \rho_{0})
+	p_{i} = k(\rho_{i}^{*} - \rho_{0}),
 \end{equation}
 
 where $ \rho_{0} $ is the system's reference density and k is the stiffness parameter. Negative pressures are clamped to zero as in \cite{ihmsen2013implicit} to prevent the water splashes from being absorbed as a result of the induced cohesive effect. Finally, the respective pressure forces are calculated using the momentum-preserving variant:
 
 \begin{equation}
 	\label{eq5}
-	F_{i}^{pressure} = -m_{i}\sum_{j}m_{j}\left(\frac{p_{i}}{(\rho_{i}^{*})^{2}} + \frac{p_{j}}{(\rho_{j}^{*})^{2}}\right)\nabla W_{ij}
+	\boldsymbol{F}_{i}^{pressure} = -m_{i}\sum_{j}m_{j}\left(\frac{p_{i}}{(\rho_{i}^{*})^{2}} + \frac{p_{j}}{(\rho_{j}^{*})^{2}}\right)\nabla W_{ij}.
 \end{equation}
 
 This pressure force is then solely responsible for the explicit velocity and position update of the particle, which we discuss in the next subsection.
@@ -185,16 +187,16 @@ Despite the fact that multiple common numerical time integration schemes would f
 \begin{equation}
 \begin{split}
 	\label{eq6}
-	v_{i}(t + \delta t) &= v_{i}(t) + \delta t\frac{F_{i}^{pressure}(t)}{m_{i}} \\
-	x_{i}(t + \delta t) &= x_{i}(t) + \delta t v_{i}(t + \delta t) + \frac{\delta t^{2}}{2}\frac{F_{i}^{pressure}(t)}{m_{i}}
+	\boldsymbol{v}_{i}(t + \delta t) &= \boldsymbol{v}_{i}(t) + \delta t\frac{\boldsymbol{F}_{i}^{pressure}(t)}{m_{i}} \\
+	\boldsymbol{x}_{i}(t + \delta t) &= \boldsymbol{x}_{i}(t) + \delta t \boldsymbol{v}_{i}(t + \delta t) + \frac{\delta t^{2}}{2}\frac{\boldsymbol{F}_{i}^{pressure}(t)}{m_{i}}.
 \end{split}
 \end{equation}
 
-where in addition to a first-order Taylor expansion, a second-order term is added to the position updating equation to facilitate stabler behavior when applying larger time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum step size for an individual particle is given by:
+Here $ \delta t $ denotes the individual step size of particle i. In addition to a first-order Taylor expansion, a second-order term is added here to the position updating equation to facilitate stabler behavior when applying larger time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel, which is typically set to be twice as large as the initial particle spacing $r_{i}$. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum step size for an individual particle is given by:
 
 \begin{equation}
 	\label{eq7}
-	\delta t_{i} = min(\lambda_{v}\frac{2r_{i}}{|v_{i}|}, \lambda_{F}\sqrt{\frac{2r_{i}}{F_{i}^{pressure}/m_{i}}})
+	\delta t_{i} = min(\lambda_{v}\frac{2r_{i}}{|\boldsymbol{v}_{i}|}, \lambda_{F}\sqrt{\frac{2r_{i}}{\boldsymbol{F}_{i}^{pressure}/m_{i}}}),
 \end{equation}
 
 where $ \lambda_{v} $ and $ \lambda_{F} $ scales the two terms respectively. In previous approaches where a globally adaptive stepping scheme is used, the system-wide step size is naturally chosen to be minimum of Eq. \eqref{eq7} over all particles.
@@ -206,7 +208,14 @@ As explained in previous sections, conventional approaches of fixed or globally 
 
 \subsection{Sequential Execution of Asynchronous Simulation}
 
-To achieve such asynchronous SPH simulation, the solver has to constantly ensure that particle $ i $ that currently being processed has immediate access to the attributes $ A_{j} $ of neighboring particles $ j $ at time stamp $ t_{i} $. Since all particles advance through time independently, this can only be achieved if the attributes of neighboring particles can be temporally interpolated. Fortunately, by employing the splitting concept, the non-iterative SPH integration already provides a feasible way to conduct such reconstruction efficiently.
+To achieve such asynchronous SPH simulation, the solver has to constantly ensure that the current particle $ i $ has immediate access to the attributes of its neighboring particles at time stamp $ t_{i} $. Since all particles advance through time independently, this can only be achieved if the attribute $ A_{j} $ of any neighbor $ j $ can be temporally interpolated as
+
+\begin{equation}
+	\label{eq9}
+	\delta A_{j}(t_{i}) = A_{j}(t_{j}) + (t_{i} - t_{j})\frac{\delta A_{j}(t_{j})}{\delta t}.
+\end{equation}
+
+Fortunately, by employing the splitting concept, the non-iterative SPH integration already provides a feasible way to conduct such reconstruction efficiently.
 
 \begin{figure}[tb]
 	\centering
@@ -218,12 +227,12 @@ To achieve such asynchronous SPH simulation, the solver has to constantly ensure
 Similar to Alg. \ref{alg1}, one step of integration for an individual particle has the following dependencies:
 
 \begin{itemize}
-    \item The viscosity force $ F_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ is dependent on the positions $ x_{j}(t_{i}) $ and velocities $ v_{j}(t_{i}) $ of neighboring particles $j$.
-    \item The advection density $ \rho_{i}^{*} $ of particle $i$ is dependent on the advection velocities $ v_{j}^{*} $ of neighboring particles $j$.
-    \item The pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ is dependent on the advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighboring particles $j$.
+    \item The viscosity force $ \boldsymbol{F}_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ is dependent on the positions $ \boldsymbol{x}_{j}(t_{i}) $ and velocities $ \boldsymbol{v}_{j}(t_{i}) $ of neighboring particles $j$.
+    \item The advection density $ \rho_{i}^{*} $ of particle $i$ is dependent on the advection velocities $ \boldsymbol{v}_{j}^{*} $ of neighboring particles $j$.
+    \item The pressure force $ \boldsymbol{F}_{i}^{pressure}(t_{i}) $ incurred by particle $i$ is dependent on the advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighboring particles $j$.
 \end{itemize}
 
-Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ v_{j} $ and positions $ x_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in Eq. \eqref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ v_{j}^{*} $ of neighboring particles could be costly, we may assume that the paper replaces $ v_{j}^{*}(t_{i}) $ with $ v_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step. An illustration of the neighborhood reconstruction scheme is given in Fig. \ref{fig4}.
+Since velocity and position can be directly pushed forth or back in time under the symplectic Euler scheme, velocities $ \boldsymbol{v}_{j} $ and positions $ \boldsymbol{x}_{j} $ of neighboring particles $j$ are reconstructed at the current time stamp $ t_{i} $ to facilitate computation of viscosity force of the current particle. Since the second term in Eq. \eqref{eq4} approximates the temporal derivative of density, advection densities $ \rho_{j}^{*} $ of neighboring particles $j$ can be direcly pushed forth or back in time to facilitate computation of pressure force. The pressure $ p_{j} $ of neighboring particles at the current time stamp $ t_{i} $ can be computed as usual since they do not induce a high expense. Since the reconstruction of the advection velocities $ \boldsymbol{v}_{j}^{*} $ of neighboring particles could be costly, we may assume that the paper replaces $ \boldsymbol{v}_{j}^{*}(t_{i}) $ with $ \boldsymbol{v}_{j}(t_{i}) $ to cut down the total amount of operations for neighborhood reconstruction in a single particle state update. Alg. \ref{alg2} describes the outline of one individual simulation step. An illustration of the neighborhood reconstruction scheme is given in Fig. \ref{fig4}.
 
 \large
 \begin{algorithm}
@@ -238,18 +247,18 @@ Since velocity and position can be directly pushed forth or back in time under t
 	\Fn{\FMain{particle $i$}}{
 		determine maximum possible step size $ \delta t_{i} $\;
 		\;
-		reconstruct velocities $ v_{j}(t_{i}) $ and positions $ x_{j}(t_{i}) $ of neighbors $j$ at $t_{i}$\;
+		reconstruct velocities $ \boldsymbol{v}_{j}(t_{i}) $ and positions $ \boldsymbol{x}_{j}(t_{i}) $ of neighbors $j$ at $t_{i}$\;
 		\;
-		compute viscosity force $ F_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ using Eq. \eqref{eq2}\;
-		compute external forces $ F_{i}^{ext}(t_{i}) $ incurred by particle $i$\;
-		compute advection force $ F_{i}^{*}(t_{i}) $ incurred by particle $i$\;
-		compute advection velocity $ v_{i}^{*}(t_{i}) $ of particle $i$ using Eq. \eqref{eq3}\;
+		compute viscosity force $ \boldsymbol{F}_{i}^{viscosity}(t_{i}) $ incurred by particle $i$ using Eq. \eqref{eq2}\;
+		compute external forces $ \boldsymbol{F}_{i}^{ext}(t_{i}) $ incurred by particle $i$\;
+		compute advection force $ \boldsymbol{F}_{i}^{*}(t_{i}) $ incurred by particle $i$\;
+		compute advection velocity $ \boldsymbol{v}_{i}^{*}(t_{i}) $ of particle $i$ using Eq. \eqref{eq3}\;
 		compute advection density $ \rho_{i}^{*} $ of particle $i$ using Eq. \eqref{eq4}\;
 		compute pressure $ p_{i} $ of particle $i$ using Eq. \eqref{eq8}\;
 		\;
 		reconstruct advection densities $ \rho_{j}^{*} $ and pressures $ p_{j} $ of neighbors $j$ at $t_{i}$\;
 		\;
-		compute pressure force $ F_{i}^{pressure}(t_{i}) $ incurred by particle $i$ using Eq. \eqref{eq5}\;
+		compute pressure force $ \boldsymbol{F}_{i}^{pressure}(t_{i}) $ incurred by particle $i$ using Eq. \eqref{eq5}\;
 		\;
 		integrate particle $i$ over time using $ \delta t_{i} $\;
 	}
