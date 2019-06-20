@@ -59,7 +59,7 @@ Extensive studies have been conducted on the temporal adaptivity of SPH models:
 
 \begin{itemize}
     \item For synchronous SPH simulation, temporal adaptivity could be exploited as in \cite{desbrun1996smoothed}. For each global iteration the uniform step size is determined by the particle with the strictest CFL constraint. This scheme is also adopted by \cite{bender2010boundary}, who added an additional acceleration constraint as the second term to take into consideration the impact of large forces.
-    \item \cite{goswami2014regional} introduces a regionally synchronous integration model. They divide all particles into separate rigions depending on their maximum possible step size and fix a uniform step size for each region that is a multiple of the user-defined base value.
+    \item \cite{goswami2014regional} introduces a regionally synchronous integration model. They divide all particles into separate regions depending on their maximum possible step size and fix a uniform step size for each region that is a multiple of the user-defined base value.
     \item \cite{desbrun1996smoothed} explored the possibility to apply individual times steps. For each particle the user-defined simulation step size is divided by powers of two to the extent such that the CFL condition is met. Forces are evaluated only at individual time steps to facilitate gains in performance. \cite{ban2018adaptively} follows this idea and proposes a semi-synchronous time stepping scheme. They introduce the concept of a virtual system time line that advances with the smallest individual step size of all particles. Particles with an individual step size that exceeds the gap between its own time stamp and the system checkpoint are deactivated and only propagated forward using linear interpolation. Those that are active are instead evaluated in the same procedure as in the fully synchronous setting. Such a stepping strategy still introduces a great number of global synchronization barriers although the overall operations are cut down to some extent.
 \end{itemize}
 
@@ -152,7 +152,7 @@ Based on the advection forces, intermediate advection velocity is computed as
 
 \begin{equation}
 	\label{eq3}
-	\boldsymbol{v}_{i}^{*} = \boldsymbol{v}_{i}(t) + \delta t\frac{\boldsymbol{F}_{i}^{advection}}{m_{i}}.
+	\boldsymbol{v}_{i}^{*} = \boldsymbol{v}_{i}(t) + \delta t_{i}\frac{\boldsymbol{F}_{i}^{advection}}{m_{i}}.
 \end{equation}
 
 This equation can be perceived as an intermediate velocity update using symplectic Euler without considering the impact of pressure forces. The first-order spatial derivative of velocity reflects the divergence of the velocity field and is used to compute the advection density. Again, the paper chooses the robust variant presented by \cite{monaghan1992smoothed} and computes the advection density via
@@ -187,12 +187,12 @@ Despite the fact that multiple common numerical time integration schemes would f
 \begin{equation}
 \begin{split}
 	\label{eq6}
-	\boldsymbol{v}_{i}(t + \delta t) &= \boldsymbol{v}_{i}(t) + \delta t\frac{\boldsymbol{F}_{i}^{pressure}(t)}{m_{i}} \\
-	\boldsymbol{x}_{i}(t + \delta t) &= \boldsymbol{x}_{i}(t) + \delta t \boldsymbol{v}_{i}(t + \delta t) + \frac{\delta t^{2}}{2}\frac{\boldsymbol{F}_{i}^{pressure}(t)}{m_{i}}.
+	\boldsymbol{v}_{i}(t_{i} + \delta t_{i}) &= \boldsymbol{v}_{i}(t_{i}) + \delta t_{i}\frac{\boldsymbol{F}_{i}^{pressure}(t_{i})}{m_{i}} \\
+	\boldsymbol{x}_{i}(t_{i} + \delta t_{i}) &= \boldsymbol{x}_{i}(t_{i}) + \delta t_{i}\boldsymbol{v}_{i}(t_{i} + \delta t_{i}) + \frac{\delta t_{i}^{2}}{2}\frac{\boldsymbol{F}_{i}^{pressure}(t_{i})}{m_{i}}.
 \end{split}
 \end{equation}
 
-Here $ \delta t $ denotes the individual step size of particle i. In addition to a first-order Taylor expansion, a second-order term is added here to the position updating equation to facilitate stabler behavior when applying larger time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel, which is typically set to be twice as large as the initial particle spacing $r_{i}$. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum step size for an individual particle is given by:
+In addition to a first-order Taylor expansion, a second-order term is added here to the position updating equation to facilitate stabler behavior when applying larger time steps. For numerical stability and correct behavior of the particles, the size of each global time step has to be chosen in a way such that it fulfills the CFL condition. Intuitively, CFL condition enforces that a particle does not travel in one time step a distance that exceeds the smoothing length of the interpolating kernel, which is typically set to be twice as large as the initial particle spacing $r_{i}$. Such a constraint could guarantee that a particle does not leap over its spatial neighbors and thus fail to interact properly with them. Similarly, \cite{bender2010boundary} introduces a constraint on acceleration of the particle that targets the same outcome. Putting these two constraints together, the maximum step size for an individual particle is given by:
 
 \begin{equation}
 	\label{eq7}
@@ -321,7 +321,7 @@ A parallel implementation of the aforementioned time stepping scheme is not stra
 The proposed parallelization scheme presupposes a few conditions to ensure its efficiency. To justify the feasibility of the approach, we need to investigate a few implementation details with discretion.
 
 \paragraph{Step size clipping}
-Despite global synchronization barriers are avoided throughout the simulation, in practice it still helps to clip the invididual time steps to be a multiple of 0.5 ms as in \cite{goswami2014regional}: Chances are high that spatially adjacent particles tend to be assigned the same step size. When a particle has a neighbor that is equally advanced in time thanks to this clipping operation, the reconstruction of this particular neighbor could be omitted. This could be a huge drop in amount operations for interaction-intensive regions.
+Despite global synchronization barriers are avoided throughout the simulation, in practice it still helps to clip the individual time steps to be a multiple of 0.5 ms as in \cite{goswami2014regional}: Chances are high that spatially adjacent particles tend to be assigned the same step size. When a particle has a neighbor that is equally advanced in time thanks to this clipping operation, the reconstruction of this particular neighbor could be omitted. This could be a huge drop in amount operations for interaction-intensive regions.
 
 \paragraph{Maintenance of neighborhood information}
 To grant efficient query and update of particle neighbors, a uniform grid storing the cells in a one-dimensional array using Z-curve indexing is employed. Since the full construction of such spatial data structure induces a high computational expenditure, a global update of all grid cells is only carried out at each virtual export barrier. To ensure the correctness of a usual neighborhood search implementation, the particles have to be monitored each time they advance in space and time. If a particle changes cell after one individual step, a reference to the particle is instantly added to the new cell without removing the old reference. This is to deal with cases where one neighbor $j$ of a particle $i$ is no longer in $i$'s vicinity after advancing but by the current time stamp $t_{i}$ it still was and should contribute to particle $i$'s attribute computation. Since the kernel function is of compact support, such cell update strategy does not lead to false neighbors and only induces a small extra cost.
